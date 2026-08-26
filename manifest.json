@@ -1,0 +1,30 @@
+{
+  "name": "TFS Field Machining Assistant",
+  "short_name": "TFS Machining",
+  "description": "One Job Brain \u2014 Plain Language \u2014 Field First",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050b11",
+  "theme_color": "#f05a00",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/tfs-field-machining-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/tfs-field-machining-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/tfs-field-machining-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
