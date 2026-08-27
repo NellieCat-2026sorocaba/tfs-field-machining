@@ -402,6 +402,10 @@
 <div class="maintabpanel" id="mtab-bearing">
 <div class="panel">
   <h2>Setup — bearings along the bar</h2>
+  <div class="mode-toggle" id="boreEndToggle">
+    <button data-mode="both" class="active">Bearings both sides</button>
+    <button data-mode="open">Open end / blind bore</button>
+  </div>
   <div class="note">Bearing 1 = 0", nearest the drive. Add the rest as distance from it.</div>
   <div id="bearingList"></div>
   <div class="row" style="margin-top:8px;">
@@ -438,6 +442,59 @@
     <label>Cutting load — direct entry (lbf), overridden below if using cutting-parameter mode</label>
     <input type="number" id="cutLoad" value="400" step="10">
   </div>
+</div>
+
+<div class="panel" id="openEndPanel" style="display:none;">
+  <h2>Open End / Blind Bore — bearing stacking</h2>
+  <div class="note">Last bore has support on one side only. The bar cantilevers past the final bearing to
+  reach the cut, so the stack behind it is all the rigidity you get.</div>
+  <div class="row" style="margin-top:10px;">
+    <div class="field">
+      <label>Last bearing to bore face (in) — max 5" for tool adjust</label>
+      <input type="number" id="oeFaceGap" value="5" step="0.25">
+    </div>
+    <div class="field">
+      <label>Open-end bore length (in)</label>
+      <input type="number" id="oeBoreLen" value="6" step="0.5">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Bearing-to-bearing spacing (in) — as tight as your hardware allows</label>
+      <input type="number" id="oeStackSpan" value="4.5" step="0.5">
+    </div>
+    <div class="field">
+      <label>Bore-side bearing back to RDU (in) — used for the 1-bearing case</label>
+      <input type="number" id="oeRduDist" value="20" step="0.5">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Minimum gap you can actually work in (in)</label>
+      <input type="number" id="oeMinAccess" value="3.5" step="0.25">
+    </div>
+    <div class="field">
+      <label>Depth into bore to check (in) — blank = full depth</label>
+      <input type="number" id="oeDepth" step="0.25" placeholder="e.g. 3">
+    </div>
+  </div>
+  <div class="field">
+    <label>Acceptable taper on diameter (in) — your tolerance for this bore</label>
+    <input type="number" id="oeTolerance" value="0.002" step="0.0005">
+  </div>
+  <details>
+    <summary>What this recommendation uses</summary>
+    <div class="details-body"><div class="note">
+    Pulled from what you've already entered elsewhere, so nothing is asked twice:<br>
+    • <b>Bar diameter, material</b> — Job Context panel<br>
+    • <b>Depth of cut, feed, insert lead angle</b> — "Derive cutting force" section above (tick it on, or this falls back to the direct cutting-load figure)<br>
+    • <b>Toolholder stickout &amp; shank size</b> — "Insert/toolholder overhang" section above<br>
+    • <b>Face gap, bearing spacing, bore length, working minimum, tolerance</b> — this panel<br>
+    Anything missing just drops out of the recommendation rather than being guessed at.
+    </div></div>
+  </details>
+  <div id="openEndDiagram" style="margin-top:12px;"></div>
+  <div id="openEndOut"></div>
 </div>
 
 <div class="panel">
@@ -498,16 +555,49 @@
       <select id="activePortSelect"><option value="">— select bar first —</option></select>
     </div>
   </div>
-  <div class="row">
+  <div class="note" style="margin-top:10px;"><b>Drive train</b> — measured <i>behind</i> Bearing 1 (away from
+  the work). Enter as positive numbers.</div>
+  <div class="row" style="margin-top:8px;">
     <div class="field">
-      <label>RDU / drive unit position (in from Bearing 1) — 0 = at Bearing 1</label>
-      <input type="number" id="rduPos" value="0" step="0.5">
+      <label>RDU behind Bearing 1 (in)</label>
+      <input type="number" id="rduPos" value="8" step="0.5">
     </div>
     <div class="field">
-      <label>Drive engagement needed (in) — bar length gripped by the RDU</label>
-      <input type="number" id="driveEngage" value="6" step="1">
+      <label>AFU behind Bearing 1 (in) — axial feed unit</label>
+      <input type="number" id="afuPos" value="20" step="0.5">
     </div>
   </div>
+  <div class="row">
+    <div class="field">
+      <label>Engagement needed (in) — bar gripped past the rearmost unit</label>
+      <input type="number" id="driveEngage" value="6" step="1">
+    </div>
+    <div class="field">
+      <label>Tool-adjust clearance BEFORE bore (in)</label>
+      <input type="number" id="retractEntry" value="2.5" step="0.5">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Tool-adjust clearance AFTER bore (in) — set 0 if not needed</label>
+      <input type="number" id="retractExit" value="2.5" step="0.5">
+    </div>
+    <div class="field"></div>
+  </div>
+  <div class="divider"></div>
+  <div class="note"><b>OEM bar length formula</b> — the manufacturer's own rule, which lumps all the
+  mount/drive hardware into one constant. Usually the number to trust.</div>
+  <div class="row" style="margin-top:8px;">
+    <div class="field">
+      <label>Workpiece span (in) — outer edge to outer edge</label>
+      <input type="number" id="oemWorkpiece" step="0.5" placeholder="e.g. 38">
+    </div>
+    <div class="field">
+      <label>Machine hardware allowance (in) — 27.5" per OEM drawing</label>
+      <input type="number" id="oemAllowance" value="27.5" step="0.5">
+    </div>
+  </div>
+  <div id="oemBarLength"></div>
   <div id="barLengthRec"></div>
   <div id="setupGeometry"></div>
   <div class="divider"></div>
@@ -992,11 +1082,11 @@ function loadJobBrain(){
     if(!saved) return defaultJobBrain();
     const d = defaultJobBrain();
     return {
-      bore: Object.assign(d.bore, saved.bore||{}),
-      material: Object.assign(d.material, saved.material||{}),
-      bar: Object.assign(d.bar, saved.bar||{}),
-      inventory: saved.inventory || [],
-      boringBars: saved.boringBars || []
+      bore: Object.assign(d.bore, (saved.bore && typeof saved.bore==='object') ? saved.bore : {}),
+      material: Object.assign(d.material, (saved.material && typeof saved.material==='object') ? saved.material : {}),
+      bar: Object.assign(d.bar, (saved.bar && typeof saved.bar==='object') ? saved.bar : {}),
+      inventory: Array.isArray(saved.inventory) ? saved.inventory : [],
+      boringBars: Array.isArray(saved.boringBars) ? saved.boringBars : []
     };
   } catch(e){ return defaultJobBrain(); }
 }
@@ -1418,7 +1508,7 @@ function renderBoreList(){
   document.querySelectorAll('#boreList .btn.danger').forEach(b=>{
     b.addEventListener('click', ()=>{
       boreList.splice(parseInt(b.dataset.idx),1);
-      renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength();
+      renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength(); oemBarLength();
     });
   });
 }
@@ -1429,7 +1519,7 @@ $('addBoreBtn').addEventListener('click', ()=>{
   boreList.push({start:st, len:ln});
   boreList.sort((a,b)=>a.start-b.start);
   $('newBoreStart').value=''; $('newBoreLen').value='';
-  renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength();
+  renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength(); oemBarLength();
 });
 
 // ---------- Bearing list (multi-bearing, replaces old fixed 2-bearing model) ----------
@@ -1462,6 +1552,10 @@ function renderBearingList(){
 $('addBearingBtn').addEventListener('click', ()=>{
   const val = parseFloat($('newBearingPos').value);
   if(!isFinite(val) || val<=0) return;
+  if(bearingPositions.some(b => Math.abs(b-val) < 1e-6)){
+    $('newBearingPos').value = '';
+    return;   // already a bearing there; a duplicate adds nothing but confusion
+  }
   bearingPositions.push(val);
   bearingPositions.sort((a,b)=>a-b);
   $('newBearingPos').value = '';
@@ -1606,8 +1700,297 @@ document.querySelectorAll('#mtab-bearing input, #mtab-bearing select').forEach(e
   el.addEventListener('change', calcBearing);
 });
 
+// ---------- Open End / Blind Bore: bearing stacking ----------
+// Deliberately does NOT model mount stiffness — operator's mounts are rigid
+// but unquantified in the field, and inventing a number would make the
+// "optimum" span look calculated when it isn't. Shows the two real,
+// calculable effects and lets the tradeoff be visible.
+let boreEndMode = 'both';
+$('boreEndToggle').addEventListener('click', e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  boreEndMode = e.target.dataset.mode;
+  [...$('boreEndToggle').children].forEach(b=>b.classList.toggle('active', b===e.target));
+  $('openEndPanel').style.display = boreEndMode==='open' ? 'block' : 'none';
+  calcOpenEnd();
+});
+
+// Live scale drawing of the open-end layout. Redraws from the same inputs
+// the numbers use, so the picture can't drift from the calculation.
+function drawOpenEnd(faceGap, boreLen, S, R, a, nBrg){
+  const el = $('openEndDiagram');
+  if(!el) return;
+  const W = 380, H = 150;
+  const padL = 12, padR = 30;
+  const xMin = -R, xMax = a;
+  const range = xMax - xMin;
+  if(range <= 0){ el.innerHTML=''; return; }
+  const sc = (W - padL - padR) / range;
+  const X = v => padL + (v - xMin) * sc;
+  const yBar = 74, barH = 9;
+
+  let g = '';
+  // bar
+  g += `<rect x="${X(xMin)}" y="${yBar - barH/2}" width="${(xMax-xMin)*sc}" height="${barH}" fill="#9198a1" rx="2"/>`;
+  // workpiece with the bore through it
+  const wx = X(faceGap), ww = boreLen*sc;
+  g += `<rect x="${wx}" y="${yBar-30}" width="${ww}" height="60" fill="#26282b" stroke="#5a6068" stroke-width="1.5"/>`;
+  g += `<rect x="${wx}" y="${yBar-barH/2-3}" width="${ww}" height="${barH+6}" fill="#17181a"/>`;
+  g += `<text x="${wx+ww/2}" y="${yBar+26}" fill="#9198a1" font-size="9" text-anchor="middle">BORE ${fmt(boreLen,1)}"</text>`;
+  // RDU
+  g += `<rect x="${X(-R)-6}" y="${yBar-20}" width="16" height="40" fill="#3a3f45" stroke="#5a6068"/>`;
+  g += `<text x="${X(-R)+2}" y="${yBar+34}" fill="#9198a1" font-size="9" text-anchor="middle">RDU</text>`;
+  // bearings, clustered behind the bore
+  for(let i=0; i<nBrg; i++){
+    const bx = X(-i*S);
+    g += `<rect x="${bx-5}" y="${yBar-17}" width="10" height="34" fill="#f05a00" rx="2"/>`;
+    g += `<text x="${bx}" y="${yBar+30}" fill="#f05a00" font-size="9" text-anchor="middle">B${i+1}</text>`;
+  }
+  // tool at the worst-case cut position
+  g += `<line x1="${X(a)}" y1="${yBar-barH/2}" x2="${X(a)}" y2="${yBar-26}" stroke="#e2584a" stroke-width="2"/>`;
+  g += `<circle cx="${X(a)}" cy="${yBar-28}" r="3" fill="#e2584a"/>`;
+  g += `<text x="${X(a)+4}" y="${yBar-30}" fill="#e2584a" font-size="9" text-anchor="start">TOOL</text>`;
+  // face gap dimension
+  const yd = yBar + 46;
+  g += `<line x1="${X(0)}" y1="${yd}" x2="${X(faceGap)}" y2="${yd}" stroke="#7fb8e0" stroke-width="1"/>`;
+  g += `<line x1="${X(0)}" y1="${yd-4}" x2="${X(0)}" y2="${yd+4}" stroke="#7fb8e0"/>`;
+  g += `<line x1="${X(faceGap)}" y1="${yd-4}" x2="${X(faceGap)}" y2="${yd+4}" stroke="#7fb8e0"/>`;
+  g += `<text x="${X(faceGap/2)}" y="${yd-6}" fill="#7fb8e0" font-size="9" text-anchor="middle">gap ${fmt(faceGap,1)}"</text>`;
+  // overhang dimension
+  const yo = yBar + 62;
+  g += `<line x1="${X(0)}" y1="${yo}" x2="${X(a)}" y2="${yo}" stroke="#e2584a" stroke-width="1"/>`;
+  g += `<line x1="${X(0)}" y1="${yo-4}" x2="${X(0)}" y2="${yo+4}" stroke="#e2584a"/>`;
+  g += `<line x1="${X(a)}" y1="${yo-4}" x2="${X(a)}" y2="${yo+4}" stroke="#e2584a"/>`;
+  g += `<text x="${X(a/2)}" y="${yo+12}" fill="#e2584a" font-size="9" text-anchor="middle">unsupported overhang ${fmt(a,1)}"</text>`;
+  // spacing dimension between B1 and B2
+  if(nBrg > 1){
+    const ys = yBar - 44;
+    g += `<line x1="${X(-S)}" y1="${ys}" x2="${X(0)}" y2="${ys}" stroke="#f05a00" stroke-width="1"/>`;
+    g += `<line x1="${X(-S)}" y1="${ys-4}" x2="${X(-S)}" y2="${ys+4}" stroke="#f05a00"/>`;
+    g += `<line x1="${X(0)}" y1="${ys-4}" x2="${X(0)}" y2="${ys+4}" stroke="#f05a00"/>`;
+    g += `<text x="${X(-S/2)}" y="${ys-5}" fill="#f05a00" font-size="9" text-anchor="middle">${fmt(S,1)}"</text>`;
+  }
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H+40}" style="width:100%; height:auto; background:#1a1c1f; border:1px solid var(--line); border-radius:8px;">${g}</svg>` +
+    `<div class="note" style="margin-top:4px;">Drawn to scale from your inputs, showing the <b>recommended 3-bearing layout</b> — bearings tight behind the bore, RDU out at the far end. If you're running one or two, the table below still applies; the picture won't match the machine.</div>`;
+}
+
+function calcOpenEnd(){
+  const el = $('openEndOut');
+  if(!el || boreEndMode !== 'open') return;
+  const d = jobBrain.bar.diameter;
+  const E = jobBrain.bar.modulusE || 29e6;
+  const faceGap = parseFloat($('oeFaceGap').value);
+  const boreLen = parseFloat($('oeBoreLen').value);
+  const S = parseFloat($('oeStackSpan').value);
+  const R = parseFloat($('oeRduDist').value);
+  const minAccess = parseFloat($('oeMinAccess').value) || 0;
+  const depthIn = parseFloat($('oeDepth').value);
+  // Pull the real cutting force from the shared cutting-force model if it's on,
+  // rather than the flat default — a finish pass and a roughing pass are not
+  // the same load, and the taper scales directly with it.
+  const useFM = $('useForceModel') && $('useForceModel').checked;
+  const KcT = {P:200000,M:325000,K:165000,N:85000,S:250000,H:325000}[jobBrain.material.isoGroup] || 200000;
+  const docT  = parseFloat($('doc').value);
+  const feedT = parseFloat($('feedRate').value);
+  const leadT = parseFloat($('leadAngle').value);
+  const P = (useFM && isFinite(docT) && isFinite(feedT) && isFinite(leadT))
+              ? KcT*docT*feedT*leadT
+              : (parseFloat($('cutLoad').value) || 400);
+  if(!d || !isFinite(faceGap) || !isFinite(boreLen) || !isFinite(S) || S<=0 || !isFinite(R) || R<=0){ el.innerHTML=''; return; }
+
+  const I = Math.PI*Math.pow(d,4)/64;
+  const a = faceGap + boreLen;        // worst case: tool at the far end of the bore
+  const M = P*a;                      // moment the overhang applies at the last support
+  const cantilever = P*Math.pow(a,3)/(3*E*I);   // same for every config
+
+  // Rotation at the last support, by number of bearings behind the bore.
+  //  1 brg: the next support back is the RDU  -> span R
+  //  2 brg: simply-supported span S           -> theta = M*S/(3EI)
+  //  3 brg: continuous over 2 spans of S/2, statically indeterminate.
+  //         Three-moment equation gives interior moment -M/4, so
+  //         theta = 7*M*(S/2)/(24EI). Verified: 0.44x the 2-bearing value
+  //         over the same total span.
+  // Layout rule (operator): bearings clustered right behind the bore, RDU
+  // pushed to the far end. So spacing is the hardware-limited input and the
+  // stack grows backward as bearings are added.
+  const configs = [
+    {n:1, span:R, theta: M*R/(3*E*I),        note:'next support back is the RDU'},
+    {n:2, span:S, theta: M*S/(3*E*I),        note:'one span across the stack'},
+    {n:3, span:S, theta: 7*M*S/(24*E*I),     note:'two spans, third bearing shares the moment'}
+  ];
+  configs.forEach(c => { c.defl = c.theta*a + cantilever; });
+
+  drawOpenEnd(faceGap, boreLen, S, R, a, 3);
+
+  let html = '';
+  if(faceGap > 5.0001){
+    html += `<div class="note"><span class="flag warn">over 5"</span> Face gap of ${fmt(faceGap,2)}" exceeds the 5" tool-adjust limit — and this is the number that matters most, see below.</div>`;
+  }
+  html += `<div class="readout"><span class="k">Cantilever overhang (worst point in cut)</span><span class="v">${fmt(a,2)}<span class="unit">in</span></span></div>`;
+  html += `<div class="readout"><span class="k">Overhang L/D</span><span class="v">${fmt(a/d,2)}<span class="unit">:1</span></span></div>`;
+
+  html += `<div class="divider"></div>`;
+  html += `<div class="note" style="margin-bottom:6px;"><b>Deflection at the tool by bearing count</b> (at ${fmt(S,1)}" spacing):</div>`;
+  html += `<table style="width:100%; font-size:12px;"><tr style="color:var(--muted); text-align:left;"><th>Bearings</th><th>Deflection</th><th>vs 1 brg</th></tr>`;
+  configs.forEach(c=>{
+    const mark = (c.n===3) ? ' style="color:var(--amber); font-weight:700;"' : '';
+    html += `<tr${mark}><td>${c.n}</td><td>${fmt(c.defl,5)}"</td><td>${fmt(c.defl/configs[0].defl*100,0)}%</td></tr>`;
+  });
+  html += `</table>`;
+
+  // --- Deflection at any depth, and the taper it produces ---
+  // Deflection varies with how far the tool has reached in, so the difference
+  // between entry and full depth IS the taper the bore will come out with.
+  const deflAtDepth = dep => {
+    const aa = faceGap + dep;
+    return 7*P*S*aa*aa/(24*E*I) + P*Math.pow(aa,3)/(3*E*I);
+  };
+  const dEntry = deflAtDepth(0);
+  const dFull  = deflAtDepth(boreLen);
+  const taperRad = dFull - dEntry;
+
+  html += `<div class="divider"></div>`;
+  html += `<div class="note" style="margin-bottom:6px;"><b>Deflection through the cut</b> (3 bearings, ${fmt(S,1)}" spacing):</div>`;
+  html += `<table style="width:100%; font-size:12px;"><tr style="color:var(--muted); text-align:left;"><th>Depth in</th><th>Overhang</th><th>Deflection</th></tr>`;
+  const steps = [0, boreLen*0.25, boreLen*0.5, boreLen*0.75, boreLen];
+  if(isFinite(depthIn) && depthIn>=0 && depthIn<=boreLen) steps.push(depthIn);
+  [...new Set(steps.map(v=>Math.round(v*100)/100))].sort((x,y)=>x-y).forEach(dep=>{
+    const isPick = isFinite(depthIn) && Math.abs(dep-depthIn)<0.005;
+    const mark = isPick ? ' style="color:var(--amber); font-weight:700;"' : '';
+    html += `<tr${mark}><td>${fmt(dep,2)}"${isPick?' ←':''}</td><td>${fmt(faceGap+dep,2)}"</td><td>${fmt(deflAtDepth(dep),5)}"</td></tr>`;
+  });
+  html += `</table>`;
+  if(isFinite(depthIn)){
+    if(depthIn < 0 || depthIn > boreLen){
+      html += `<div class="note"><span class="flag warn">outside the bore</span> ${fmt(depthIn,2)}" is beyond the ${fmt(boreLen,1)}" bore length.</div>`;
+    } else {
+      html += `<div class="note">At ${fmt(depthIn,2)}" in, the tool hangs ${fmt(faceGap+depthIn,2)}" past the last bearing and deflects <b>${fmt(deflAtDepth(depthIn),5)}"</b>.</div>`;
+    }
+  }
+  html += `<div class="readout"><span class="k">Taper across the bore <span class="flag est">from deflection alone</span></span><span class="v">${fmt(taperRad*2,4)}<span class="unit">in on diameter</span></span></div>`;
+  html += `<div class="note"><b>This is the number that shows up on your bore gauge.</b> The tool pushes away harder the deeper it reaches, so it removes less material and the bore closes up with depth — ${fmt(dEntry,5)}" of deflection at entry against ${fmt(dFull,5)}" at full depth, giving ${fmt(taperRad*2,4)}" of taper on diameter. Deflection alone; it does not include bar-to-bearing clearance, mount flex, or tool wear through the cut.</div>`;
+
+  // --- Ranked recommendation against the operator's tolerance ---
+  const tol = parseFloat($('oeTolerance').value);
+  const taperDia = taperRad*2;
+
+  // Toolholder is a second cantilever at the tool. It deflects the same amount
+  // at every depth, so it shifts SIZE but adds no taper — worth separating.
+  const tOH = parseFloat($('toolOverhang').value);
+  const tDia = parseFloat($('toolDia').value);
+  const tShape = $('toolShape') ? $('toolShape').value : 'square';
+  let toolDefl = 0;
+  if(isFinite(tOH) && isFinite(tDia) && tOH>0 && tDia>0){
+    const It = tShape==='square' ? Math.pow(tDia,4)/12 : Math.PI*Math.pow(tDia,4)/64;
+    toolDefl = P*Math.pow(tOH,3)/(3*E*It);
+  }
+
+  html += `<div class="divider"></div>`;
+  html += `<div class="readout"><span class="k">Cutting force used <span class="flag ${useFM?'calc':'est'}">${useFM?'derived from DOC/feed/lead':'flat default'}</span></span><span class="v">${fmt(P,0)}<span class="unit">lbf radial</span></span></div>`;
+  if(!useFM){
+    html += `<div class="note"><span class="flag warn">using the flat ${fmt(P,0)} lbf default</span> Tick on "Derive cutting force" above and this recommendation gets far more honest — a finish pass can be a fraction of the roughing load, and taper scales directly with it.</div>`;
+  }
+  if(toolDefl > 0.00005){
+    html += `<div class="readout"><span class="k">Toolholder deflection <span class="flag est">size, not taper</span></span><span class="v">${fmt(toolDefl,5)}<span class="unit">in</span></span></div>`;
+    html += `<div class="note">The toolholder deflects the same amount at every depth, so it makes the whole bore ${fmt(toolDefl*2,4)}" small on diameter but adds <b>no taper</b>. Dial it out on your first cut rather than chasing it with the bearings.</div>`;
+  }
+
+  html += `<div class="divider"></div>`;
+  if(isFinite(tol) && tol>0){
+    const pass = taperDia <= tol;
+    html += `<div class="readout"><span class="k">Taper vs tolerance</span><span class="v"><span class="flag ${pass?'calc':'warn'}">${pass?'within tolerance':'over tolerance'}</span></span></div>`;
+    html += `<div class="note">${fmt(taperDia,4)}" predicted against ${fmt(tol,4)}" allowed${pass?` — about ${fmt((1-taperDia/tol)*100,0)}% of budget spare.`:` — over by ${fmt(taperDia-tol,4)}".`}</div>`;
+
+    if(!pass){
+      // Recompute taper under each single change, rank by actual effect
+      const taperWith = (pp, fg, ss) => {
+        const f = dep => { const aa=fg+dep; return 7*pp*ss*aa*aa/(24*E*I) + pp*Math.pow(aa,3)/(3*E*I); };
+        return (f(boreLen)-f(0))*2;
+      };
+      const opts = [];
+      if(useFM && isFinite(docT) && docT>0.005){
+        const nd = Math.max(0.005, docT/3);
+        opts.push({label:`Cut DOC from ${fmt(docT,3)}" to ${fmt(nd,3)}"`, t:taperWith(KcT*nd*feedT*leadT, faceGap, S), why:'force is directly proportional to DOC — the strongest single lever'});
+      }
+      if(useFM && isFinite(feedT) && feedT>0.002){
+        const nf = Math.max(0.002, feedT/2);
+        opts.push({label:`Cut feed from ${fmt(feedT,4)}" to ${fmt(nf,4)}" IPR`, t:taperWith(KcT*docT*nf*leadT, faceGap, S), why:'force scales with feed; costs cycle time'});
+      }
+      if(useFM && leadT > 0.3){
+        opts.push({label:'Switch to a 0° lead insert', t:taperWith(KcT*docT*feedT*0.25, faceGap, S), why:'roughly halves radial force vs a 15° lead'});
+      }
+      if(faceGap > minAccess + 0.26){
+        opts.push({label:`Close face gap ${fmt(faceGap,2)}" → ${fmt(minAccess,2)}"`, t:taperWith(P, minAccess, S), why:'your stated working minimum — biggest geometric lever'});
+      }
+      if(S > 3){
+        opts.push({label:`Tighten bearing spacing ${fmt(S,1)}" → 3.0"`, t:taperWith(P, faceGap, 3), why:'less rotation at the last support'});
+      }
+      opts.forEach(o => o.gain = (1 - o.t/taperDia)*100);
+      opts.sort((a,b)=> a.t - b.t);
+
+      if(opts.length){
+        html += `<div class="note" style="margin-top:8px;"><b>What to change, strongest first:</b></div>`;
+        html += `<table style="width:100%; font-size:12px;"><tr style="color:var(--muted); text-align:left;"><th>Change</th><th>New taper</th><th>Gain</th></tr>`;
+        opts.forEach(o=>{
+          const ok = o.t <= tol;
+          html += `<tr${ok?' style="color:var(--green);"':''}><td>${o.label}${ok?' ✓':''}</td><td>${fmt(o.t,4)}"</td><td>${fmt(o.gain,0)}%</td></tr>`;
+        });
+        html += `</table>`;
+        const solo = opts.filter(o=>o.t<=tol);
+        html += solo.length
+          ? `<div class="note"><span class="flag calc">${solo.length} single change gets you there</span> Green rows land inside tolerance on their own. Cheapest is usually reducing DOC and taking an extra pass.</div>`
+          : `<div class="note"><span class="flag warn">no single change is enough</span> Stack two or more — DOC plus face gap is normally the pair that works. A spring pass at near-zero DOC is the last resort if geometry is fixed.</div>`;
+        opts.slice(0,2).forEach(o=>{ html += `<div class="note">• <b>${o.label}</b> — ${o.why}.</div>`; });
+      }
+    }
+  }
+
+  // Face-gap sensitivity — this is the dominant lever, so show it plainly
+  html += `<div class="divider"></div>`;
+  html += `<div class="note" style="margin-bottom:6px;"><b>Effect of moving the bearings closer to the bore</b> (3 bearings, ${fmt(S,1)}" spacing):</div>`;
+  html += `<table style="width:100%; font-size:12px;"><tr style="color:var(--muted); text-align:left;"><th>Face gap</th><th>Deflection</th><th>vs 5"</th><th>Access</th></tr>`;
+  const deflAt = fg => { const aa=fg+boreLen, MM=P*aa; return 7*MM*S/(24*E*I)*aa + P*Math.pow(aa,3)/(3*E*I); };
+  const base5 = deflAt(5);
+  [2,3,4,5].forEach(fg=>{
+    const dfl = deflAt(fg);
+    const usable = fg >= minAccess - 1e-9;
+    const mark = Math.abs(fg-faceGap)<0.26 ? ' style="color:var(--amber); font-weight:700;"'
+               : (!usable ? ' style="color:#6a6f76;"' : '');
+    const tag = usable ? '<span style="color:var(--green);">ok</span>' : '<span style="color:var(--red);">too tight</span>';
+    html += `<tr${mark}><td>${fg}"</td><td>${fmt(dfl,5)}"</td><td>${fmt(dfl/base5*100,0)}%</td><td>${tag}</td></tr>`;
+  });
+  html += `</table>`;
+  html += `<div class="note"><b>The gap is doing two jobs at once.</b> Rigidity wants it closed; you need it open to reach in and set the tool. Rows under your ${fmt(minAccess,2)}" working minimum are greyed out — they're stiffer on paper but you can't adjust a tool in that space, so they aren't real options. Set that minimum from your own reach and tooling, not from this table.</div>`;
+  const bestGap = Math.max(minAccess, 0);
+  if(faceGap > minAccess + 0.26){
+    const gain = (deflAt(faceGap) - deflAt(bestGap)) / deflAt(faceGap) * 100;
+    html += `<div class="note"><span class="flag est">room to tighten</span> You're at ${fmt(faceGap,2)}" with a stated working minimum of ${fmt(minAccess,2)}". Closing to ${fmt(bestGap,2)}" would cut deflection about ${fmt(gain,0)}% — worth doing only if you can still genuinely get at the tool.</div>`;
+  } else if(faceGap < minAccess - 0.26){
+    html += `<div class="note"><span class="flag warn">below your working minimum</span> ${fmt(faceGap,2)}" is tighter than the ${fmt(minAccess,2)}" you said you need. Stiffest on paper, but you won't be able to adjust the tool.</div>`;
+  } else {
+    html += `<div class="note"><span class="flag calc">at your practical limit</span> ${fmt(faceGap,2)}" is about as tight as you can go and still work. Further rigidity has to come from the stack, not the gap.</div>`;
+  }
+
+  html += `<div class="note"><b>Priority, in order:</b><br>
+  1. <b>Close the face gap to your working minimum — but not past it.</b> Biggest <i>geometric</i> lever (5"→2" roughly halves deflection), and the one you can't overdo without losing access to the tool. Note that cutting parameters usually beat it — see the recommendation above, where reducing DOC typically wins.<br>
+  2. <b>Stack the bearings tight.</b> Tighter spacing means less rotation at the last support.<br>
+  3. <b>Add a third bearing.</b> Real, but worth only a few percent at the same spacing — do it after the first two.<br>
+  Keep the RDU out at the far end; once you have two or more bearings close to the bore, its distance barely affects the tool.</div>`;
+
+  html += `<div class="divider"></div>`;
+  html += `<div class="readout"><span class="k">Unavoidable cantilever portion</span><span class="v">${fmt(cantilever,5)}<span class="unit">in</span></span></div>`;
+  html += `<div class="note">Comes purely from the ${fmt(a,2)}" of bar past the last bearing. <b>No amount of stacking removes it</b> — only closing the face gap or reaching less far into the bore does.</div>`;
+
+  html += `<div class="note" style="margin-top:10px;"><b>Assumes a rigid setup.</b> Bearings and mounts treated as immovable, so these are best-case numbers. <b>Rigidity is the whole game</b> — brace the mounts as solidly as you can, because any flex or bar-to-bearing clearance adds movement on top of this and none of it is in these figures. Take a first cut, measure what you actually got, and adjust from there.</div>`;
+
+  el.innerHTML = html;
+}
+['oeFaceGap','oeBoreLen','oeStackSpan','oeRduDist','oeMinAccess','oeDepth','oeTolerance','cutLoad','doc','feedRate','leadAngle','toolOverhang','toolDia'].forEach(id=>{
+  const e=$(id); if(e) e.addEventListener('input', calcOpenEnd);
+});
+
 // ---------- Boring Bar Inventory ----------
-function loadBars(){ return jobBrain.boringBars || []; }
+function loadBars(){ return Array.isArray(jobBrain.boringBars) ? jobBrain.boringBars : []; }
 function saveBars(list){ jobBrain.boringBars = list; saveJobBrain(); }
 
 function renderBarInv(){
@@ -1664,14 +2047,19 @@ $('addBarBtn').addEventListener('click', ()=>{
 $('activeBarSelect').addEventListener('change', ()=>{ populatePortSelect(); analyzePorts(); recommendBarLength(); });
 $('activePortSelect').addEventListener('change', analyzePorts);
 $('rduPos').addEventListener('input', ()=>{ analyzePorts(); recommendBarLength(); });
-$('driveEngage').addEventListener('input', recommendBarLength);
+$('driveEngage').addEventListener('input', ()=>{ recommendBarLength(); oemBarLength(); });
+['oemWorkpiece','oemAllowance','afuPos','retractEntry','retractExit'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input', ()=>{ analyzePorts(); recommendBarLength(); oemBarLength(); }); });
 
 // Build the list of port positions (distance from the physical end of the
 // bar) for a given bar profile.
 function portsForBar(bar){
   const ports = [];
+  // Guard: non-positive spacing or length would loop forever / build an
+  // invalid array. Return empty and let callers show "no ports" instead.
+  if(!bar || !(bar.spacing > 0) || !(bar.len > 0) || !isFinite(bar.firstPort)) return ports;
   let p = bar.firstPort;
-  while(p <= bar.len + 1e-9){ ports.push(p); p += bar.spacing; }
+  let guard = 0;
+  while(p <= bar.len + 1e-9 && guard++ < 5000){ ports.push(p); p += bar.spacing; }
   return ports;
 }
 
@@ -1691,12 +2079,44 @@ function populatePortSelect(){
 
 // Bar length needed, derived from bearings + bores + RDU alone. Runs even
 // with no bar selected, so it can be used to decide WHICH bar to grab.
+// OEM's own bar-length rule: workpiece span + fixed hardware allowance + stroke.
+// Simpler and more authoritative than deriving it from every component position.
+function oemBarLength(){
+  const el = $('oemBarLength');
+  if(!el) return;
+  const wp = parseFloat($('oemWorkpiece').value);
+  const allow = parseFloat($('oemAllowance').value);
+  const rEntry = parseFloat($('retractEntry').value) || 0;
+  const rExit  = parseFloat($('retractExit').value) || 0;
+  if(!isFinite(wp) || !isFinite(allow)){ el.innerHTML = '<div class="note">Enter the workpiece span to use the OEM rule.</div>'; return; }
+  if(!boreList.length){ el.innerHTML=''; return; }
+  const boreStartMin = Math.min(...boreList.map(b=>b.start));
+  const boreEndMax   = Math.max(...boreList.map(b=>b.start+b.len));
+  const stroke = rEntry + (boreEndMax - boreStartMin) + rExit;
+  const oemLen = wp + allow + stroke;
+  let html = `<div class="readout"><span class="k">OEM bar length <span class="flag calc">manufacturer rule</span></span><span class="v">${fmt(oemLen,1)}<span class="unit">in (${fmt(oemLen/12,2)} ft)</span></span></div>`;
+  html += `<div class="note">${fmt(wp,1)}" workpiece + ${fmt(allow,1)}" hardware allowance + ${fmt(stroke,1)}" stroke. The allowance covers the bearing mounts, RDU and AFU as one lumped constant — it is machine-specific, so change it if your machine's drawing gives a different figure.</div>`;
+  const bars = loadBars();
+  const fits = bars.filter(b=>b.len>=oemLen).sort((a,b)=>a.len-b.len);
+  if(bars.length){
+    html += fits.length
+      ? `<div class="note"><span class="flag calc">${fits.length} of ${bars.length} bars fit</span> Shortest that works: <b>${fits[0].name||'(unnamed)'}</b> at ${fmt(fits[0].len,0)}".</div>`
+      : `<div class="note"><span class="flag warn">no bar long enough</span> All your bars are under ${fmt(oemLen,1)}".</div>`;
+  }
+  el.innerHTML = html;
+}
+
 function recommendBarLength(){
   const el = $('barLengthRec');
   if(!el) return;
   if(!boreList.length || bearingPositions.length < 1){ el.innerHTML=''; return; }
-  const rduPos = parseFloat($('rduPos').value) || 0;
+  // RDU/AFU entered as distance BEHIND Bearing 1 -> negative in the bearing frame.
+  const rduPos = -(parseFloat($('rduPos').value) || 0);
+  const afuPos = -(parseFloat($('afuPos').value) || 0);
+  const rearmostUnit = Math.min(rduPos, afuPos);   // whichever sits furthest back
   const engage = parseFloat($('driveEngage').value) || 0;
+  const rEntry = parseFloat($('retractEntry').value) || 0;
+  const rExit  = parseFloat($('retractExit').value) || 0;
   const lastBearing = bearingPositions[bearingPositions.length-1];
   const boreEndMax = Math.max(...boreList.map(b=>b.start+b.len));
 
@@ -1706,13 +2126,30 @@ function recommendBarLength(){
   const bars = loadBars();
   const idx = $('activeBarSelect').value;
   const bar = idx==='' ? null : bars[parseInt(idx)];
-  const P = bar ? bar.firstPort : 1;  // closest-to-tip port = shortest bar that works
+  // The port can't just be the one nearest the tip — it has to sit far enough
+  // back that the bar still spans every bearing at the START of the cut.
+  const boreStartMin = Math.min(...boreList.map(b=>b.start));
+  // Bar must still span every bearing at its MOST RETRACTED position — which is
+  // the tool backed clear of the bore for adjustment, not just the bore entry.
+  const minPortDist = Math.max(0, lastBearing - boreStartMin + rEntry);
+  const spacing = bar ? bar.spacing : 3;
+  const firstP  = bar ? bar.firstPort : 1;
+  let P = firstP;
+  while(P < minPortDist - 1e-9) P += spacing;   // step up to a real port position
+  const portNum = Math.round((P - firstP)/spacing) + 1;
 
-  const minLen = boreEndMax + P - rduPos + engage;
+  // Length is set by the two extremes of TRAVEL, not one static position:
+  //   most extended  -> tip at boreEndMax + P, rear must still be gripped
+  //   most retracted -> tip at boreStartMin - retract + P, must still span bearings
+  const tipMax = boreEndMax + rExit + P;
+  const rearNeeded = rearmostUnit - engage;
+  const minLen = tipMax - rearNeeded;
+  const feedStroke = rEntry + (boreEndMax - boreStartMin) + rExit;
 
   let html = '<div class="divider"></div>';
   html += `<div class="readout"><span class="k">Minimum bar length for this setup <span class="flag calc">calc</span></span><span class="v">${fmt(minLen,1)}<span class="unit">in (${fmt(minLen/12,2)} ft)</span></span></div>`;
-  html += `<div class="note">Furthest cut ${fmt(boreEndMax,1)}" out; with a port ${fmt(P,1)}" from the tip the bar reaches ${fmt(boreEndMax+P,1)}" and must still sit ${fmt(engage,1)}" in the drive. A port further from the tip needs a longer bar.</div>`;
+  html += `<div class="readout"><span class="k">Axial feed stroke needed</span><span class="v">${fmt(feedStroke,1)}<span class="unit">in</span></span></div>`;
+  html += `<div class="note">Bar travel, not just reach, sets the length. Cut spans ${fmt(boreEndMax-boreStartMin,1)}", plus ${fmt(rEntry,1)}" before and ${fmt(rExit,1)}" after to clear the tool for adjustment = ${fmt(feedStroke,1)}" of stroke. The port must sit ${fmt(minPortDist,1)}" back from the tip (Port ${portNum} at ${fmt(P,1)}") so the bar still spans every bearing when fully retracted. At full extension the tip is at ${fmt(tipMax,1)}" and the rear must still be gripped ${fmt(engage,1)}" past the ${afuPos<rduPos?'AFU':'RDU'} at ${fmt(-rearmostUnit,1)}" behind Bearing 1.</div>`;
 
   if(bars.length){
     const fits = bars.filter(b => b.len >= minLen).sort((a,b)=>a.len-b.len);
@@ -1748,14 +2185,23 @@ function analyzePorts(){
   const boreStart = Math.min(...boreList.map(b=>b.start));
   const boreEnd   = Math.max(...boreList.map(b=>b.start+b.len));
   const lastBearing = bearingPositions[bearingPositions.length-1];
-  const rduPos = parseFloat($('rduPos').value) || 0;
+  const rduPos = -(parseFloat($('rduPos').value) || 0);
+  const afuPosG = -(parseFloat($('afuPos').value) || 0);
+  const rearmostG = Math.min(rduPos, afuPosG);
+  const rEntryG = parseFloat($('retractEntry').value) || 0;
+  const rExitG  = parseFloat($('retractExit').value) || 0;
 
   // Bar tip position when the tool (in this port) is at the END of the cut
   // -- the worst case for tip overhang, since the bar has fed fully through.
-  const tipAtEnd = boreEnd + portFromEnd;
+  const tipAtEnd   = boreEnd + rExitG + portFromEnd;
+  const tipAtStart = boreStart - rEntryG + portFromEnd;   // fully retracted for tool adjust = furthest back
   const tipOverhang = tipAtEnd - lastBearing;
   const rearAtEnd = tipAtEnd - bar.len;
-  const rearBehindRDU = rduPos - rearAtEnd; // positive = bar sticks out behind RDU
+  const rearBehindRDU = rearmostG - rearAtEnd; // positive = bar sticks out behind the rearmost unit
+  // The bar has to actually pass THROUGH every bearing for the whole cut.
+  // Worst case is the start of the cut, when the tip is furthest back.
+  const reachesLastBearing = tipAtStart >= lastBearing;
+  const missedBearings = bearingPositions.filter(b => b > tipAtStart);
 
   const activePortIdx = portsForBar(bar).findIndex(x => Math.abs(x - portFromEnd) < 1e-9);
   const altBar = bar.portOrient === 'alt90';
@@ -1786,9 +2232,12 @@ function analyzePorts(){
     html += `<div class="note"><span class="${ldFlag}">${fmt(ld,1)}:1</span> ${ldNote}.</div>`;
     html += `<div class="readout"><span class="k">Cantilever natural frequency <span class="flag est">chatter indicator</span></span><span class="v">${fmt(fn,0)}<span class="unit">Hz</span></span></div>`;
     html += `<div class="note">Lower frequency = more chatter-prone. Falls off sharply as overhang grows, so small increases in stick-out matter a lot. This is the overhang carrying cutting load.</div>`;
+  } else if(!reachesLastBearing){
+    html += `<div class="readout"><span class="k">Bar reach <span class="flag warn">does not span all bearings</span></span><span class="v">short by ${fmt(lastBearing - tipAtStart,2)}<span class="unit">in</span></span></div>`;
+    html += `<div class="note"><b>This port will not work.</b> At the start of the cut the bar tip only reaches ${fmt(tipAtStart,2)}", so bearing(s) at ${missedBearings.map(b=>fmt(b,0)+'"').join(', ')} have no bar in them — they support nothing. Pick a port further from the tip (see suggested port below), or move the bearings in.</div>`;
   } else {
     html += `<div class="readout"><span class="k">Tip overhang past last bearing</span><span class="v"><span class="flag calc">none</span></span></div>`;
-    html += `<div class="note">Tool port stays within the supported bearing span through the whole cut — the stiffest arrangement.</div>`;
+    html += `<div class="note">Bar spans every bearing for the whole cut and the tool stays inside the supported span — the stiffest arrangement.</div>`;
   }
 
   // --- Rear overhang: unloaded, honestly flagged as not modeled ---
@@ -1818,35 +2267,34 @@ function analyzePorts(){
   }
 
   // --- Port recommendation ---
+  // --- Port recommendation, PER BORE ---
+  // Operator-confirmed: different bores get different ports. A port only has
+  // to work for the bore it's cutting, not for the whole setup at once.
   const allPorts = portsForBar(bar);
-  const scored = [];
-  allPorts.forEach((pf, i) => {
-    const tEnd = boreEnd + pf;
-    const rEnd = tEnd - bar.len;
-    const ov = Math.max(0, tEnd - lastBearing);
-    const driveEngaged = rEnd <= rduPos + 1e-9;
-    if(driveEngaged) scored.push({port:i+1, pf, ov, ld: ov/d});
-  });
-  scored.sort((a,b)=> a.ov - b.ov || a.pf - b.pf);
+  const engageBar = parseFloat($('driveEngage').value) || 0;
   html += `<div class="divider"></div>`;
-  if(scored.length === 0){
-    html += `<div class="note"><span class="flag warn">no workable port</span> With this bar length, bearing layout and RDU position, no port lets the bar reach the cut while staying engaged in the drive. A longer bar, or moving the bearings/RDU, is needed.</div>`;
-  } else {
-    const best = scored[0];
-    const cur = scored.find(x => Math.abs(x.pf - portFromEnd) < 1e-9);
-    html += `<div class="readout"><span class="k">Suggested port <span class="flag calc">least tip overhang</span></span><span class="v">Port ${best.port}<span class="unit">${fmt(best.pf,1)}" from end</span></span></div>`;
-    if(best.ov === 0){
-      html += `<div class="note">Port ${best.port} keeps the cut fully inside the supported bearing span for the whole pass — no tip cantilever at all, the stiffest option available on this bar.</div>`;
-    } else {
-      html += `<div class="note">Port ${best.port} gives the least tip overhang available on this bar (${fmt(best.ov,2)}", L/D ${fmt(best.ld,2)}). No port fully avoids cantilever with this bearing layout.</div>`;
-    }
-    if(cur && Math.abs(cur.pf - best.pf) > 1e-9){
-      html += `<div class="note"><span class="flag est">currently selected</span> Port ${cur.port} gives ${fmt(cur.ov,2)}" overhang (L/D ${fmt(cur.ld,2)}) — switching to Port ${best.port} would reduce it.</div>`;
-    } else if(cur){
-      html += `<div class="note"><span class="flag calc">already on it</span> Your selected port is the best available choice for this setup.</div>`;
-    }
-    html += `<div class="note">Ranked on tip overhang, filtered to ports that keep the bar in the drive. Access, tool reach and where the cut lands are still your call.</div>`;
-  }
+  html += `<div class="note" style="margin-bottom:6px;"><b>Suggested port per bore</b> — each bore gets its own port, so the far bore uses one near the tip and the near bore one further back.</div>`;
+
+  boreList.forEach((bore, bi) => {
+    const A = bore.start, B = bore.start + bore.len;
+    const minP = lastBearing - A + rEntryG;      // span bearings when fully retracted
+    const cands = [];
+    allPorts.forEach((pf, i) => {
+      const tEnd = B + rExitG + pf;
+      const rEnd = tEnd - bar.len;
+      if(pf >= minP - 1e-9 && rEnd <= rearmostG - engageBar + 1e-9){
+        cands.push({port:i+1, pf, ov: Math.max(0, tEnd - lastBearing)});
+      }
+    });
+    cands.sort((a,b)=> a.pf - b.pf);
+    const div = `<div class="readout"><span class="k">Bore ${bi+1} (${fmt(A,1)}"–${fmt(B,1)}")</span><span class="v">` +
+      (cands.length
+        ? `Port ${cands[0].port}<span class="unit">${fmt(cands[0].pf,1)}" from tip, ${fmt(cands[0].ov,1)}" tip overhang</span>`
+        : `<span class="flag warn">no workable port</span><span class="unit">needs port ≥ ${fmt(minP,1)}" from tip</span>`) +
+      `</span></div>`;
+    html += div;
+  });
+  html += `<div class="note">Each port is the closest-to-tip option that still spans every bearing when retracted and keeps the bar gripped at full extension. Access, tool reach and where the cut lands are still your call.</div>`;
 
   // --- Multi-bore: can two tools cut both bores in one pass? ---
   if(boreList.length > 1){
@@ -1873,7 +2321,11 @@ function analyzePorts(){
       if(exact){
         html += `<div class="note"><span class="flag calc">exact match</span> ${bar.spacing}" port spacing divides evenly into this bore spacing — two tools line up perfectly, feed stroke is just the bore length (${fmt(singleStroke,2)}").</div>`;
       } else {
-        html += `<div class="note"><span class="flag est">${fmt(best.mis,2)}" off</span> ${bar.spacing}" ports don't divide evenly into ${fmt(boreGap,2)}", so two tools can't line up exactly. <b>Not a blocker</b> — it just means feeding ${fmt(best.stroke,2)}" instead of ${fmt(singleStroke,2)}" so both tools fully clear their bores. Cost: ${fmt(best.stroke-singleStroke,2)}" extra stroke.</div>`;
+        const extra = best.stroke - singleStroke;
+        html += `<div class="note"><span class="flag est">${fmt(best.mis,2)}" off</span> ${bar.spacing}" ports don't divide evenly into ${fmt(boreGap,2)}", so the two tools sit ${fmt(best.mis,2)}" out of perfect alignment. ` +
+          (extra < 0.005
+            ? `<b>No cost here</b> — the shorter bore still falls inside the ${fmt(best.stroke,2)}" stroke the longer bore needs anyway.`
+            : `<b>Not a blocker</b> — feed ${fmt(best.stroke,2)}" instead of ${fmt(singleStroke,2)}" so both tools fully clear their bores (${fmt(extra,2)}" extra stroke).`) + `</div>`;
       }
       html += `<div class="note">${sameOrient ? 'Both ports share the same orientation (even number of steps apart on an alternating-90° bar).' : 'These ports are 90° apart on an alternating bar — the two tools push in perpendicular directions. The bar rotates so both still cut round, but their deflection directions differ.'} Verify tool reach and that your feed unit has the stroke before committing.</div>`;
     }
@@ -1974,7 +2426,7 @@ function calcInsert(){
   // Show which owned tools (from the shared inventory, managed in Cutting
   // Strategy Planner > My Tooling) actually match this pass's cut type —
   // right here where the recommendation is, not a separate hop away.
-  const inv = jobBrain.inventory || [];
+  const inv = Array.isArray(jobBrain.inventory) ? jobBrain.inventory : [];
   const matches = inv.filter(t => t.use === cutType || (cutType==='general' && t.use==='general'));
   const list = $('matchingInvList');
   list.innerHTML = '';
@@ -2001,7 +2453,7 @@ document.querySelectorAll('#mtab-bearing input, #mtab-bearing select').forEach(e
 // ============ CUTTING STRATEGY PLANNER TAB ============
 
 // ---------- Inventory — now lives in jobBrain.inventory (shared) ----------
-function loadInv(){ return jobBrain.inventory || []; }
+function loadInv(){ return Array.isArray(jobBrain.inventory) ? jobBrain.inventory : []; }
 function saveInv(list){ jobBrain.inventory = list; saveJobBrain(); }
 
 function renderInv(){
@@ -2383,6 +2835,12 @@ function calcSleeveInterference(){
   const nu = 0.29;
   if(!rI || !c || !rO || !interferenceDiametral) return;
 
+  if(rI >= c || c >= rO){
+    $('slPressure').textContent = '–'; $('slCollapse').textContent = '–';
+    $('slCollapsePct').innerHTML = '<span class="flag warn">check dimensions</span>';
+    $('slPreMachineID').textContent = '–';
+    return;
+  }
   const delta = interferenceDiametral/2; // radial interference
   const innerTerm = (c/Ebush) * ((c*c+rI*rI)/(c*c-rI*rI) - nu);
   const outerTerm = (c/Ehouse) * ((rO*rO+c*c)/(rO*rO-c*c) + nu);
@@ -2433,6 +2891,8 @@ renderBoreList();
 renderBearingList();
 renderBarInv();
 recommendBarLength();
+oemBarLength();
+calcOpenEnd();
 calcBearing();
 calcInsert();
 renderInv();
