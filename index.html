@@ -256,9 +256,14 @@
     </div>
 
     <div class="field">
-      <label>Target travel rate (IPM)</label>
-      <input type="number" id="targetIPM" value="20" step="0.1">
+      <label>Baseline rotation rate — 100% (IPM). Reference starting point, not fixed law.</label>
+      <input type="number" id="baselineIPM" value="20" step="0.1">
     </div>
+    <div class="field" id="rotationPctField">
+      <label>Rotation adjustment from baseline (%)</label>
+      <input type="number" id="rotationPct" value="0" step="5">
+    </div>
+    <div class="readout"><span class="k">Actual rotation <span class="flag calc" id="rotModeFlag">York — live %</span></span><span class="v" id="outActualRotation">–</span></div>
 
     <h2 style="margin-top:4px;">Weld Parameters</h2>
     <div class="row">
@@ -397,25 +402,132 @@
 
 <div class="maintabpanel" id="mtab-bearing">
 <div class="panel">
-  <h2>Setup — two-bearing span (99% of portable line boring)</h2>
-  <div class="note">Bar diameter and bore length now come from the shared Job Context panel above.</div>
-  <div class="row" style="margin-top:10px;">
+  <h2>Setup — bearings along the bar</h2>
+  <div class="note">Bar diameter and bore length come from the shared Job Context panel above. <b>Corrected:</b>
+  most portable line boring setups use more than two bearings, not just a near/far pair — this now models any
+  number of bearings positioned along the bar, matching a real multi-bearing layout (e.g. the BB5000 wide-span
+  setup with an intermediate mid-bearing), not just the two-endpoint case.</div>
+
+  <div class="note" style="margin-top:10px;">Bearing 1 is the reference point (position 0", nearest the
+  machine/drive). Add each additional bearing as its distance from Bearing 1.</div>
+  <div id="bearingList"></div>
+  <div class="row" style="margin-top:8px;">
     <div class="field">
-      <label>Bearing-to-bearing span (in)</label>
-      <input type="number" id="spanLen" value="24" step="0.5">
+      <label>Add bearing at distance from Bearing 1 (in)</label>
+      <input type="number" id="newBearingPos" step="0.5" placeholder="e.g. 20">
     </div>
-    <div class="field">
-      <label>Near bearing to bore start (in)</label>
-      <input type="number" id="entryOffset" value="4" step="0.5">
+    <div class="field" style="display:flex; align-items:flex-end;">
+      <button class="btn" id="addBearingBtn" style="width:100%;">Add bearing</button>
     </div>
   </div>
-  <div class="note">The cutter travels through the bore length, so its distance to each bearing changes
-  continuously during the pass — this models both ends of that travel and the far-bearing overhang case,
-  instead of one fixed "overhang" snapshot.</div>
+
+  <div class="divider"></div>
+  <div class="note" style="margin-bottom:6px;"><b>Bores in this setup</b> — same reference frame as the
+  bearings (0" = Bearing 1). Add each bore you'll machine without breaking the setup down. Bore 1's length
+  stays synced to the shared Job Context.</div>
+  <div id="boreList"></div>
+  <div class="row" style="margin-top:8px;">
+    <div class="field">
+      <label>Bore start (in from Bearing 1)</label>
+      <input type="number" id="newBoreStart" step="0.5" placeholder="e.g. 4">
+    </div>
+    <div class="field">
+      <label>Bore length (in)</label>
+      <input type="number" id="newBoreLen" step="0.5" placeholder="e.g. 7">
+    </div>
+  </div>
+  <button class="btn" id="addBoreBtn">Add bore</button>
+  <div class="note">The cutter travels through the bore length, crossing whichever bearings/sub-spans lie
+  along the way — this checks every sub-span the cutter passes through (including local worst points inside
+  a span, not just the two ends of the whole bore), plus cantilever past the last bearing if the bore extends
+  beyond it.</div>
   <div class="field" style="margin-top:10px;">
     <label>Cutting load — direct entry (lbf), overridden below if using cutting-parameter mode</label>
     <input type="number" id="cutLoad" value="400" step="10">
   </div>
+</div>
+
+<div class="panel">
+  <h2>Boring Bar Inventory — tool port safety check</h2>
+  <div class="note">Bar profile is pure bar geometry — first port measured from the physical end of the bar,
+  then uniform center-to-center spacing for the rest. <b>Bar position is set by which tool port you're
+  cutting from</b> (selected below), not assumed — the port carrying the tool sits at the cut, and everything
+  else (tip overhang, rear overhang) follows from that.</div>
+
+  <div class="row" style="margin-top:10px;">
+    <div class="field">
+      <label>Bar name/label</label>
+      <input type="text" id="barName" placeholder="e.g. 2.250 Bar #1">
+    </div>
+    <div class="field">
+      <label>Bar diameter (in)</label>
+      <input type="number" id="barProfileDia" step="0.01" placeholder="e.g. 2.250">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Bar length (in)</label>
+      <input type="number" id="barProfileLen" step="0.5" placeholder="e.g. 48">
+    </div>
+    <div class="field">
+      <label>First port from tip end (in)</label>
+      <input type="number" id="firstPortFromEnd" step="0.25" placeholder="e.g. 1">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Spacing between ports, center to center (in)</label>
+      <input type="number" id="portSpacing" step="0.25" placeholder="e.g. 3">
+    </div>
+    <div class="field">
+      <label>Tool port size (in) — for local stiffness check</label>
+      <input type="number" id="portDia" step="0.0625" placeholder="e.g. 0.5">
+    </div>
+  </div>
+  <div class="field">
+    <label>Port orientation along the bar</label>
+    <select id="portOrient">
+      <option value="alt90">Alternating 90° to each other</option>
+      <option value="aligned">All ports same orientation</option>
+    </select>
+  </div>
+  <button class="btn" id="addBarBtn">Add bar to inventory</button>
+
+  <div class="divider"></div>
+  <div class="note" style="margin-bottom:6px;"><b>Your bars:</b></div>
+  <div id="barInvList"></div>
+  <div class="note" id="barInvEmptyNote"></div>
+
+  <div class="row" style="margin-top:12px;">
+    <div class="field">
+      <label>Active bar for this setup</label>
+      <select id="activeBarSelect"><option value="">— none selected —</option></select>
+    </div>
+    <div class="field">
+      <label>Tool port in use (sets bar position)</label>
+      <select id="activePortSelect"><option value="">— select bar first —</option></select>
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>RDU / drive unit position (in from Bearing 1) — 0 = at Bearing 1</label>
+      <input type="number" id="rduPos" value="0" step="0.5">
+    </div>
+    <div class="field">
+      <label>Drive engagement needed (in) — bar length gripped by the RDU</label>
+      <input type="number" id="driveEngage" value="6" step="1">
+    </div>
+  </div>
+  <div id="barLengthRec"></div>
+  <div id="setupGeometry"></div>
+  <div class="divider"></div>
+  <details>
+    <summary>All ports on this bar vs. bearings (at end of cut)</summary>
+    <div class="details-body">
+      <div class="note" id="portListNote" style="margin-bottom:6px;"></div>
+      <div id="portAnalysis"></div>
+    </div>
+  </details>
 </div>
 
 <div class="panel">
@@ -892,7 +1004,8 @@ function defaultJobBrain(){
     bore: {diameter:6.125, length:10, currentID:6.125, targetID:6.000},
     material: {isoGroup:'P', cutType:'rough', steelSubtype:'mild'},
     bar: {diameter:1.75, modulusE:29000000},
-    inventory: []
+    inventory: [],
+    boringBars: []
   };
 }
 function loadJobBrain(){
@@ -904,7 +1017,8 @@ function loadJobBrain(){
       bore: Object.assign(d.bore, saved.bore||{}),
       material: Object.assign(d.material, saved.material||{}),
       bar: Object.assign(d.bar, saved.bar||{}),
-      inventory: saved.inventory || []
+      inventory: saved.inventory || [],
+      boringBars: saved.boringBars || []
     };
   } catch(e){ return defaultJobBrain(); }
 }
@@ -1151,7 +1265,12 @@ $('stopSpecMode').addEventListener('change', ()=>{
 
 function calcWeld(){
   const D = jobBrain.bore.diameter;
-  const targetIPM = parseFloat($('targetIPM').value);
+  const baselineIPM = parseFloat($('baselineIPM').value);
+  const rotationPct = parseFloat($('rotationPct').value) || 0;
+  const targetIPM = baselineIPM * (1 + rotationPct/100); // actual real IPM after % adjustment
+  const brandKeyForRot = $('machineBrand').value;
+  $('rotModeFlag').textContent = brandKeyForRot==='york' ? 'York — live %' : 'target % — verify by stopwatch';
+  $('outActualRotation').innerHTML = `${rotationPct>=0?'+':''}${fmt(rotationPct,1)}% <span class="unit">→ ${fmt(targetIPM,2)} IPM</span>`;
   const d = parseFloat($('wireDia').value);
   const V = parseFloat($('voltage').value);
   const WFS = parseFloat($('wfs').value);
@@ -1293,7 +1412,7 @@ function calcWeld(){
 
 $('presetBtn').addEventListener('click', ()=>{
   jobBrain.bore.diameter=6.125; jobBrain.bore.currentID=6.125; jobBrain.bore.targetID=6.000;
-  $('targetIPM').value=20; $('wireDia').value='0.035'; $('voltage').value=17.5;
+  $('baselineIPM').value=20; $('rotationPct').value=0; $('wireDia').value='0.035'; $('voltage').value=17.5;
   $('wfs').value=250; $('step').value=0.125; transferMode='short';
   [...$('transferToggle').children].forEach(b=>b.classList.toggle('active', b.dataset.t==='short'));
   renderJobContext(); saveJobBrain(); calcWeld();
@@ -1304,21 +1423,89 @@ document.querySelectorAll('#mtab-weld input, #mtab-weld select').forEach(el=>{
   el.addEventListener('change', calcWeld);
 });
 
+// ---------- Bore list (multi-bore setups: several bores, one bar setup) ----------
+let boreList = [{start:4, len:7}];
+
+function renderBoreList(){
+  const el = $('boreList');
+  el.innerHTML = '';
+  boreList.forEach((b,i)=>{
+    const div = document.createElement('div');
+    div.className = 'toolcard';
+    const isPrimary = i===0;
+    div.innerHTML = `<div class="info"><b>Bore ${i+1}</b> — starts ${fmt(b.start,2)}", ${fmt(b.len,2)}" long (ends ${fmt(b.start+b.len,2)}")${isPrimary?' <span class="flag calc">synced to Job Context</span>':''}</div>` +
+      (isPrimary ? '' : `<button class="btn danger" data-idx="${i}" style="padding:4px 8px;">✕</button>`);
+    el.appendChild(div);
+  });
+  document.querySelectorAll('#boreList .btn.danger').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      boreList.splice(parseInt(b.dataset.idx),1);
+      renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength();
+    });
+  });
+}
+$('addBoreBtn').addEventListener('click', ()=>{
+  const st = parseFloat($('newBoreStart').value);
+  const ln = parseFloat($('newBoreLen').value);
+  if(!isFinite(st) || !isFinite(ln) || ln<=0) return;
+  boreList.push({start:st, len:ln});
+  boreList.sort((a,b)=>a.start-b.start);
+  $('newBoreStart').value=''; $('newBoreLen').value='';
+  renderBoreList(); calcBearing(); analyzePorts(); recommendBarLength();
+});
+
+// ---------- Bearing list (multi-bearing, replaces old fixed 2-bearing model) ----------
+let bearingPositions = [0, 24]; // Bearing 1 at reference 0", sensible default second bearing
+
+function renderBearingList(){
+  const list = $('bearingList');
+  list.innerHTML = '';
+  bearingPositions.forEach((pos, i) => {
+    const div = document.createElement('div');
+    div.className = 'toolcard';
+    if(i===0){
+      div.innerHTML = `<div class="info"><b>Bearing 1</b> — 0" (reference point)</div>`;
+    } else {
+      div.innerHTML = `<div class="info"><b>Bearing ${i+1}</b> — ${fmt(pos,2)}" from Bearing 1</div>
+        <button class="btn danger" data-idx="${i}" style="padding:4px 8px;">✕</button>`;
+    }
+    list.appendChild(div);
+  });
+  document.querySelectorAll('#bearingList .btn.danger').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      bearingPositions.splice(parseInt(b.dataset.idx), 1);
+      renderBearingList();
+      calcBearing();
+      analyzePorts();
+      recommendBarLength();
+    });
+  });
+}
+$('addBearingBtn').addEventListener('click', ()=>{
+  const val = parseFloat($('newBearingPos').value);
+  if(!isFinite(val) || val<=0) return;
+  bearingPositions.push(val);
+  bearingPositions.sort((a,b)=>a-b);
+  $('newBearingPos').value = '';
+  renderBearingList();
+  calcBearing();
+  analyzePorts();
+  recommendBarLength();
+});
+
 const kcByGroup = { P:200000, M:325000, K:165000, N:85000, S:250000, H:325000 };
 
 function calcBearing(){
   const d = jobBrain.bar.diameter;
-  const L = parseFloat($('spanLen').value);
-  const boreLen = jobBrain.bore.length;
-  const entryOffset = parseFloat($('entryOffset').value);
+  // Bore 1 stays synced to the shared Job Context length (One Job Brain).
+  if(boreList.length && jobBrain.bore.length) boreList[0].len = jobBrain.bore.length;
   const E = jobBrain.bar.modulusE;
-  if(!d || !L || !E || !boreLen) return;
+  if(!d || !E || !boreList.length || bearingPositions.length<2) return;
 
   const I = Math.PI * Math.pow(d,4) / 64;
   const area = Math.PI * d*d / 4;
   const density = 0.283;
   const w = density * area;
-  const sag = 5*w*Math.pow(L,4) / (384*E*I);
 
   const useForceModel = $('useForceModel').checked;
   let P;
@@ -1336,28 +1523,63 @@ function calcBearing(){
     P = parseFloat($('cutLoad').value);
   }
 
-  const exitOffset = L - entryOffset - boreLen;
-  let worstDefl, worstLabel, regime, cantOverhangUsed = 0;
+  // Cutter travel now spans EVERY bore in the setup, not one.
+  const boreStart = Math.min(...boreList.map(b=>b.start));
+  const boreEnd   = Math.max(...boreList.map(b=>b.start+b.len));
+  const lastBearing = bearingPositions[bearingPositions.length-1];
 
-  if(exitOffset >= 0){
-    regime = 'within-span';
-    const aStart = entryOffset;
-    const aEnd = entryOffset + boreLen;
-    const deflAt = (a) => { const b = L - a; return P*a*a*b*b/(3*E*I*L); };
-    const dStart = deflAt(aStart);
-    const dEnd = deflAt(aEnd);
-    if(dStart >= dEnd){ worstDefl = dStart; worstLabel = `at bore start (${fmt(aStart,2)}" from near bearing)`; }
-    else { worstDefl = dEnd; worstLabel = `at bore end (${fmt(aEnd,2)}" from near bearing, ${fmt(L-aEnd,2)}" from far)`; }
-  } else {
-    regime = 'cantilever-past-bearing';
-    cantOverhangUsed = -exitOffset;
-    worstDefl = P*Math.pow(cantOverhangUsed,3)/(3*E*I);
-    worstLabel = `cantilevered ${fmt(cantOverhangUsed,2)}" beyond the far bearing`;
+  // Sweep every sub-span between consecutive bearings that the cutter's
+  // travel actually overlaps — checking each sub-span's own local start,
+  // end, AND midpoint (off-center point-load deflection peaks near
+  // midspan), not just the two ends of the whole bore.
+  let worstDefl = 0, worstLabel = '', worstSag = 0, worstRegime = 'within-span', worstSpanIdx = -1;
+  for(let i=0; i<bearingPositions.length-1; i++){
+    const s0 = bearingPositions[i], s1 = bearingPositions[i+1];
+    const L = s1 - s0;
+    // Only evaluate positions where a bore actually is — a gap between
+    // bores isn't being cut, so it shouldn't drive the worst-case number.
+    let candidates = [];
+    boreList.forEach(bore => {
+      const bLo = Math.max(bore.start, s0), bHi = Math.min(bore.start+bore.len, s1);
+      if(bLo >= bHi) return;
+      candidates.push(bLo, bHi);
+      const mid = (s0+s1)/2;
+      if(bLo <= mid && mid <= bHi) candidates.push(mid);
+    });
+    if(candidates.length === 0) continue;
+    const sag = 5*w*Math.pow(L,4) / (384*E*I);
+    candidates.forEach(cpos => {
+      const a = cpos - s0, b = L - a;
+      const defl = P*a*a*b*b/(3*E*I*L);
+      if(defl > worstDefl){
+        worstDefl = defl;
+        worstSag = sag;
+        worstSpanIdx = i;
+        worstLabel = `Bearing ${i+1}–${i+2} span (${fmt(s0,1)}"–${fmt(s1,1)}"), cutter at ${fmt(cpos,2)}" (${fmt(a,2)}" into this span)`;
+      }
+    });
   }
 
-  $('regimeNote').innerHTML = regime==='within-span'
-    ? `<span class="flag calc">within two-bearing span</span> Cutter stays between both bearings for the whole pass. Worst point: ${worstLabel}.`
-    : `<span class="flag warn">cantilever beyond far bearing</span> Span + entry offset don't reach the bore's far edge — the cutter travels ${fmt(cantOverhangUsed,2)}" past the far bearing at the end of the pass. Worst point: ${worstLabel}.`;
+  // Cantilever past the last bearing, if the bore extends beyond it
+  let cantOverhangUsed = 0;
+  if(boreEnd > lastBearing){
+    worstRegime = 'cantilever-past-bearing';
+    cantOverhangUsed = boreEnd - lastBearing;
+    const cantDefl = P*Math.pow(cantOverhangUsed,3)/(3*E*I);
+    if(cantDefl > worstDefl){
+      worstDefl = cantDefl;
+      worstSag = 0; // cantilever region's own sag not modeled separately here — flagged in reference doc
+      worstLabel = `cantilevered ${fmt(cantOverhangUsed,2)}" beyond Bearing ${bearingPositions.length} (the last bearing)`;
+    }
+  }
+
+  if(boreStart < 0){
+    $('regimeNote').innerHTML = '<span class="flag warn">unsupported case</span> Bore starts before Bearing 1 (position 0) — cantilever-before-first-bearing isn\'t modeled yet. Reposition bearings or treat Bearing 1 as your actual first support point.';
+  } else if(worstRegime === 'cantilever-past-bearing'){
+    $('regimeNote').innerHTML = `<span class="flag warn">cantilever beyond last bearing</span> Worst point: ${worstLabel}.`;
+  } else {
+    $('regimeNote').innerHTML = `<span class="flag calc">within a supported span</span> Worst point: ${worstLabel}.`;
+  }
 
   const toolOH = parseFloat($('toolOverhang').value);
   const toolDia = parseFloat($('toolDia').value);
@@ -1373,12 +1595,12 @@ function calcBearing(){
     $('outToolDeflMain').textContent = 'not entered';
   }
 
-  const total = sag + worstDefl + toolDefl;
+  const total = worstSag + worstDefl + toolDefl;
   $('heroNum_bearing').textContent = fmt(total,4)+'"';
-  $('outSag').innerHTML = fmt(sag,5)+'<span class="unit">in</span>';
+  $('outSag').innerHTML = fmt(worstSag,5)+'<span class="unit">in (at worst-point sub-span)</span>';
   $('outCantDefl').innerHTML = fmt(worstDefl,5)+'<span class="unit">in</span>';
 
-  const finalCheckDist = regime==='within-span' ? Math.max(entryOffset, (L-entryOffset-boreLen)) : cantOverhangUsed;
+  const finalCheckDist = worstRegime==='cantilever-past-bearing' ? cantOverhangUsed : Math.max(boreStart, boreEnd - lastBearing, 0);
   const threshold = 7*d;
   $('outRatio').innerHTML = fmt(finalCheckDist/d,2)+'<span class="unit">x diameter (worst cutter-to-bearing reach)</span>';
   $('outThreshold').innerHTML = fmt(threshold,2)+'<span class="unit">in</span>';
@@ -1391,20 +1613,325 @@ function calcBearing(){
   const ratioMax = parseFloat($('barMatClass').value);
   const maxOverhang = ratioMax * d;
   $('outMaxOverhang').innerHTML = fmt(maxOverhang,2)+'<span class="unit">in ('+ratioMax+':1)</span>';
-  if(regime==='cantilever-past-bearing'){
+  if(worstRegime==='cantilever-past-bearing'){
     if(cantOverhangUsed > maxOverhang){
-      $('overhangNote').innerHTML = '<span class="flag warn">over recommended</span> Stick-out beyond the far bearing exceeds the general industry rule of thumb.';
+      $('overhangNote').innerHTML = '<span class="flag warn">over recommended</span> Stick-out beyond the last bearing exceeds the general industry rule of thumb.';
     } else {
-      $('overhangNote').innerHTML = '<span class="flag calc">within guide</span> Stick-out beyond the far bearing is within the general industry rule of thumb.';
+      $('overhangNote').innerHTML = '<span class="flag calc">within guide</span> Stick-out beyond the last bearing is within the general industry rule of thumb.';
     }
   } else {
-    $('overhangNote').innerHTML = 'Not applicable — cutter stays within the two-bearing span, a stiffer configuration than a single-clamp cantilever.';
+    $('overhangNote').innerHTML = 'Not applicable — cutter stays within a supported span between bearings, a stiffer configuration than a single-clamp cantilever.';
   }
 }
 document.querySelectorAll('#mtab-bearing input, #mtab-bearing select').forEach(el=>{
   el.addEventListener('input', calcBearing);
   el.addEventListener('change', calcBearing);
 });
+
+// ---------- Boring Bar Inventory ----------
+function loadBars(){ return jobBrain.boringBars || []; }
+function saveBars(list){ jobBrain.boringBars = list; saveJobBrain(); }
+
+function renderBarInv(){
+  const bars = loadBars();
+  const list = $('barInvList');
+  list.innerHTML = '';
+  $('barInvEmptyNote').textContent = bars.length===0 ? 'No bars added yet.' : '';
+  bars.forEach((b, i)=>{
+    const div = document.createElement('div');
+    div.className = 'toolcard';
+    div.innerHTML = `<div class="info"><b>${b.name||'(unnamed)'}</b> — ${b.dia}" dia, ${b.len}" long, first port ${b.firstPort}" from end, ${b.spacing}" spacing${b.portDia?`, ${b.portDia}" ports`:''}${b.portOrient==='alt90'?', ports alt 90°':(b.portOrient==='aligned'?', ports aligned':'')}</div>
+      <button class="btn danger" data-idx="${i}" style="padding:4px 8px;">✕</button>`;
+    list.appendChild(div);
+  });
+  document.querySelectorAll('#barInvList .btn.danger').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const bars = loadBars();
+      bars.splice(parseInt(btn.dataset.idx),1);
+      saveBars(bars);
+      renderBarInv();
+      populateActiveBarSelect();
+      recommendBarLength();
+    });
+  });
+  populateActiveBarSelect();
+}
+
+function populateActiveBarSelect(){
+  const bars = loadBars();
+  const sel = $('activeBarSelect');
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">— none selected —</option>' +
+    bars.map((b,i)=>`<option value="${i}">${b.name||'(unnamed)'} — ${b.dia}" dia</option>`).join('');
+  if(prevVal && parseInt(prevVal) < bars.length) sel.value = prevVal;
+  analyzePorts();
+}
+
+$('addBarBtn').addEventListener('click', ()=>{
+  const name = $('barName').value || 'Unnamed bar';
+  const dia = parseFloat($('barProfileDia').value);
+  const len = parseFloat($('barProfileLen').value);
+  const firstPort = parseFloat($('firstPortFromEnd').value);
+  const spacing = parseFloat($('portSpacing').value);
+  const portDia = parseFloat($('portDia').value);
+  if(!isFinite(dia) || !isFinite(len) || !isFinite(firstPort) || !isFinite(spacing)) return;
+  const bars = loadBars();
+  bars.push({name, dia, len, firstPort, spacing, portDia: isFinite(portDia)?portDia:null, portOrient: $('portOrient').value});
+  saveBars(bars);
+  renderBarInv();
+  recommendBarLength();
+  $('barName').value=''; $('barProfileDia').value=''; $('barProfileLen').value='';
+  $('firstPortFromEnd').value=''; $('portSpacing').value=''; $('portDia').value='';
+});
+$('activeBarSelect').addEventListener('change', ()=>{ populatePortSelect(); analyzePorts(); recommendBarLength(); });
+$('activePortSelect').addEventListener('change', analyzePorts);
+$('rduPos').addEventListener('input', ()=>{ analyzePorts(); recommendBarLength(); });
+$('driveEngage').addEventListener('input', recommendBarLength);
+
+// Build the list of port positions (distance from the physical end of the
+// bar) for a given bar profile.
+function portsForBar(bar){
+  const ports = [];
+  let p = bar.firstPort;
+  while(p <= bar.len + 1e-9){ ports.push(p); p += bar.spacing; }
+  return ports;
+}
+
+function populatePortSelect(){
+  const idx = $('activeBarSelect').value;
+  const sel = $('activePortSelect');
+  if(idx === ''){ sel.innerHTML = '<option value="">— select bar first —</option>'; return; }
+  const bar = loadBars()[parseInt(idx)];
+  if(!bar){ sel.innerHTML = '<option value="">— select bar first —</option>'; return; }
+  const ports = portsForBar(bar);
+  const alt = bar.portOrient === 'alt90';
+  sel.innerHTML = ports.map((p,i)=>{
+    const orient = alt ? (i%2===0 ? ' · face A' : ' · face B (90°)') : '';
+    return `<option value="${p}">Port ${i+1} — ${fmt(p,2)}" from end${orient}</option>`;
+  }).join('');
+}
+
+// Bar length needed, derived from bearings + bores + RDU alone. Runs even
+// with no bar selected, so it can be used to decide WHICH bar to grab.
+function recommendBarLength(){
+  const el = $('barLengthRec');
+  if(!el) return;
+  if(!boreList.length || bearingPositions.length < 1){ el.innerHTML=''; return; }
+  const rduPos = parseFloat($('rduPos').value) || 0;
+  const engage = parseFloat($('driveEngage').value) || 0;
+  const lastBearing = bearingPositions[bearingPositions.length-1];
+  const boreEndMax = Math.max(...boreList.map(b=>b.start+b.len));
+
+  // A tool in a port P from the tip, cutting at position C, puts the tip at
+  // C+P and the rear at C+P-barLen. Rear must sit at/behind the RDU (plus
+  // whatever length the drive needs to grip) at the furthest point of the cut.
+  const bars = loadBars();
+  const idx = $('activeBarSelect').value;
+  const bar = idx==='' ? null : bars[parseInt(idx)];
+  const P = bar ? bar.firstPort : 1;  // closest-to-tip port = shortest bar that works
+
+  const minLen = boreEndMax + P - rduPos + engage;
+
+  let html = '<div class="divider"></div>';
+  html += `<div class="readout"><span class="k">Minimum bar length for this setup <span class="flag calc">calc</span></span><span class="v">${fmt(minLen,1)}<span class="unit">in (${fmt(minLen/12,2)} ft)</span></span></div>`;
+  html += `<div class="note">Furthest cut point is ${fmt(boreEndMax,1)}" from Bearing 1. Using a port ${fmt(P,1)}" from the tip, the bar tip reaches ${fmt(boreEndMax+P,1)}" at the end of the pass — so the bar must be long enough for its rear to still sit ${fmt(engage,1)}" into the drive at that moment. Using a port further from the tip needs a proportionally longer bar.</div>`;
+
+  if(bars.length){
+    const fits = bars.filter(b => b.len >= minLen).sort((a,b)=>a.len-b.len);
+    const tooShort = bars.filter(b => b.len < minLen);
+    if(fits.length){
+      const best = fits[0];
+      html += `<div class="readout"><span class="k">Shortest bar in your inventory that works</span><span class="v">${best.name||'(unnamed)'}<span class="unit">${fmt(best.len,0)}" / ${fmt(best.len/12,1)} ft</span></span></div>`;
+      html += `<div class="note"><span class="flag calc">${fits.length} of ${bars.length} bars fit</span> Shorter is generally stiffer for the same job — less bar hanging behind the drive, less mass to whip. ${tooShort.length ? `${tooShort.length} bar(s) in inventory are too short for this setup.` : ''}</div>`;
+    } else {
+      html += `<div class="note"><span class="flag warn">no bar in inventory is long enough</span> Every bar you've entered is shorter than the ${fmt(minLen,1)}" needed. Either a longer bar, or move the RDU closer to the work.</div>`;
+    }
+  } else {
+    html += `<div class="note">Add bars to the inventory above and this will also tell you which of yours will reach.</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Full setup geometry: the selected port sits at the cut, which fixes where
+// the whole bar sits relative to the bearings. Everything else follows.
+function analyzePorts(){
+  const idx = $('activeBarSelect').value;
+  const geo = $('setupGeometry');
+  const out = $('portAnalysis');
+  if(idx === ''){ geo.innerHTML=''; out.innerHTML=''; return; }
+  const bar = loadBars()[parseInt(idx)];
+  if(!bar){ geo.innerHTML=''; out.innerHTML=''; return; }
+  if(bearingPositions.length < 2){ geo.innerHTML = '<div class="note">Add at least 2 bearings above first.</div>'; out.innerHTML=''; return; }
+
+  const portFromEnd = parseFloat($('activePortSelect').value);
+  if(!isFinite(portFromEnd)){ geo.innerHTML=''; out.innerHTML=''; return; }
+
+  if(!boreList.length) { geo.innerHTML=''; out.innerHTML=''; return; }
+  const boreStart = Math.min(...boreList.map(b=>b.start));
+  const boreEnd   = Math.max(...boreList.map(b=>b.start+b.len));
+  const lastBearing = bearingPositions[bearingPositions.length-1];
+  const rduPos = parseFloat($('rduPos').value) || 0;
+
+  // Bar tip position when the tool (in this port) is at the END of the cut
+  // -- the worst case for tip overhang, since the bar has fed fully through.
+  const tipAtEnd = boreEnd + portFromEnd;
+  const tipOverhang = tipAtEnd - lastBearing;
+  const rearAtEnd = tipAtEnd - bar.len;
+  const rearBehindRDU = rduPos - rearAtEnd; // positive = bar sticks out behind RDU
+
+  const activePortIdx = portsForBar(bar).findIndex(x => Math.abs(x - portFromEnd) < 1e-9);
+  const altBar = bar.portOrient === 'alt90';
+  const activeFace = (altBar && activePortIdx >= 0) ? (activePortIdx%2===0 ? 'face A' : 'face B (90°)') : null;
+
+  const E = jobBrain.bar.modulusE || 29e6;
+  const d = bar.dia;
+  const I = Math.PI*Math.pow(d,4)/64;
+  const density = 0.283, g = 386.09;
+  const massPerIn = (density*Math.PI*d*d/4)/g;
+
+  let html = '';
+  if(activeFace){
+    html += `<div class="readout"><span class="k">Active port orientation</span><span class="v">${activeFace}</span></div>`;
+    html += `<div class="note">Ports alternate 90° along this bar, so consecutive ports face opposite ways — worth confirming before you mount the tool. Ports an <b>even</b> number of steps apart share a face; an odd number are 90° apart.</div>`;
+  }
+
+  // --- Tip overhang: the loaded cantilever that actually drives chatter ---
+  if(tipOverhang > 0){
+    const ld = tipOverhang/d;
+    const fn = (3.516/(2*Math.PI))*Math.sqrt(E*I/(massPerIn*Math.pow(tipOverhang,4)));
+    let ldFlag, ldNote;
+    if(ld <= 4){ ldFlag='flag calc'; ldNote='within the generally-accepted range for a standard steel bar'; }
+    else if(ld <= 6){ ldFlag='flag est'; ldNote='past the ~4:1 comfort zone for standard steel — watch for chatter, consider heavier DOC'; }
+    else { ldFlag='flag warn'; ldNote='well past standard-steel limits — damped/carbide bar territory, expect chatter'; }
+    html += `<div class="readout"><span class="k">Tip overhang past last bearing <span class="flag warn">loaded cantilever</span></span><span class="v">${fmt(tipOverhang,2)}<span class="unit">in</span></span></div>`;
+    html += `<div class="readout"><span class="k">Overhang L/D ratio</span><span class="v">${fmt(ld,2)}<span class="unit">:1</span></span></div>`;
+    html += `<div class="note"><span class="${ldFlag}">${fmt(ld,1)}:1</span> ${ldNote}.</div>`;
+    html += `<div class="readout"><span class="k">Cantilever natural frequency <span class="flag est">chatter indicator</span></span><span class="v">${fmt(fn,0)}<span class="unit">Hz</span></span></div>`;
+    html += `<div class="note">Standard cantilever 1st-mode formula. Lower frequency = more chatter-prone: natural frequency falls off sharply as overhang grows (roughly with the square of length), which is why a small increase in stick-out past the last bearing has an outsized effect on chatter. This is the overhang that actually carries cutting load.</div>`;
+  } else {
+    html += `<div class="readout"><span class="k">Tip overhang past last bearing</span><span class="v"><span class="flag calc">none</span></span></div>`;
+    html += `<div class="note">Tool port stays within the supported bearing span through the whole cut — the stiffest arrangement.</div>`;
+  }
+
+  // --- Rear overhang: unloaded, honestly flagged as not modeled ---
+  html += `<div class="divider"></div>`;
+  if(rearBehindRDU > 0){
+    html += `<div class="readout"><span class="k">Bar protruding behind RDU <span class="flag est">unloaded</span></span><span class="v">${fmt(rearBehindRDU,2)}<span class="unit">in</span></span></div>`;
+    html += `<div class="note">This end carries no cutting force, so it does not deflect the tool — deliberately <b>not</b> added into the deflection numbers. It does add rotating mass and can whip at speed. No verified formula for that effect was found, so it is reported as a distance to be aware of, not converted into a fabricated number. Watch it physically if it is long.</div>`;
+  } else {
+    html += `<div class="readout"><span class="k">Bar protruding behind RDU</span><span class="v"><span class="flag calc">none</span></span></div>`;
+  }
+
+  // --- Port local stiffness reduction (orientation-aware) ---
+  if(bar.portDia){
+    const I_along = I - (bar.portDia*Math.pow(d,3)/12);   // bending along port axis
+    const I_perp  = I - (d*Math.pow(bar.portDia,3)/12);    // bending across port axis
+    const lossAlong = (1 - I_along/I)*100;
+    const lossPerp  = (1 - I_perp/I)*100;
+    html += `<div class="divider"></div>`;
+    html += `<div class="readout"><span class="k">Stiffness loss at the active port <span class="flag warn">in the radial force direction</span></span><span class="v">${fmt(lossAlong,0)}<span class="unit">%</span></span></div>`;
+    html += `<div class="note"><b>Correction worth stating plainly:</b> this is not an avoidable "worst-case orientation." The radial cutting force pushes the tool back <b>along its own port axis</b>, so the port carrying the tool always bends in the direction where its hole removes the most material. A ${bar.portDia}" port in a ${d}" bar costs about ${fmt(lossAlong,0)}% of section stiffness in that direction, versus only about ${fmt(lossPerp,0)}% across it.</div>`;
+    if(bar.portOrient === 'alt90'){
+      html += `<div class="note"><span class="flag calc">ports alternating 90°</span> Good news for this bar: because neighbouring ports are rotated 90°, they only weaken the <i>perpendicular</i> direction (~${fmt(lossPerp,0)}%), so they add very little to bending in the active port's direction. The weakening stays local to the port in use instead of stacking up along the bar.</div>`;
+    } else if(bar.portOrient === 'aligned'){
+      html += `<div class="note"><span class="flag warn">ports all aligned</span> Every port on this bar weakens the same direction, so ports near the cut compound the loss rather than distributing it. An alternating-90° bar is stiffer in practice for the same port size. Magnitude of the stacked effect isn't modelled here — a full variable-section beam analysis would be needed, so this is a directional flag, not a number.</div>`;
+    }
+    html += `<div class="note">Still <b>local to the port cross-section</b>, not a property of the whole bar — reported as a flag rather than folded into the deflection numbers above, which would overstate it across the full span.</div>`;
+  }
+
+  // --- Port recommendation ---
+  const allPorts = portsForBar(bar);
+  const scored = [];
+  allPorts.forEach((pf, i) => {
+    const tEnd = boreEnd + pf;
+    const rEnd = tEnd - bar.len;
+    const ov = Math.max(0, tEnd - lastBearing);
+    const driveEngaged = rEnd <= rduPos + 1e-9;
+    if(driveEngaged) scored.push({port:i+1, pf, ov, ld: ov/d});
+  });
+  scored.sort((a,b)=> a.ov - b.ov || a.pf - b.pf);
+  html += `<div class="divider"></div>`;
+  if(scored.length === 0){
+    html += `<div class="note"><span class="flag warn">no workable port</span> With this bar length, bearing layout and RDU position, no port lets the bar reach the cut while staying engaged in the drive. A longer bar, or moving the bearings/RDU, is needed.</div>`;
+  } else {
+    const best = scored[0];
+    const cur = scored.find(x => Math.abs(x.pf - portFromEnd) < 1e-9);
+    html += `<div class="readout"><span class="k">Suggested port <span class="flag calc">least tip overhang</span></span><span class="v">Port ${best.port}<span class="unit">${fmt(best.pf,1)}" from end</span></span></div>`;
+    if(best.ov === 0){
+      html += `<div class="note">Port ${best.port} keeps the cut fully inside the supported bearing span for the whole pass — no tip cantilever at all, the stiffest option available on this bar.</div>`;
+    } else {
+      html += `<div class="note">Port ${best.port} gives the least tip overhang available on this bar (${fmt(best.ov,2)}", L/D ${fmt(best.ld,2)}). No port fully avoids cantilever with this bearing layout.</div>`;
+    }
+    if(cur && Math.abs(cur.pf - best.pf) > 1e-9){
+      html += `<div class="note"><span class="flag est">currently selected</span> Port ${cur.port} gives ${fmt(cur.ov,2)}" overhang (L/D ${fmt(cur.ld,2)}) — switching to Port ${best.port} would reduce it.</div>`;
+    } else if(cur){
+      html += `<div class="note"><span class="flag calc">already on it</span> Your selected port is the best available choice for this setup.</div>`;
+    }
+    html += `<div class="note">Ranked purely on tip overhang past the last bearing, filtered to ports that keep the bar engaged in the drive. It does not account for physical access, tool reach into the bore, or where the cut actually needs to land — those are still your call.</div>`;
+  }
+
+  // --- Multi-bore: can two tools cut both bores in one pass? ---
+  if(boreList.length > 1){
+    html += `<div class="divider"></div>`;
+    html += `<div class="note" style="margin-bottom:6px;"><b>Multi-bore — cutting more than one bore per pass:</b></div>`;
+    for(let bi=0; bi<boreList.length-1; bi++){
+      const A1 = boreList[bi].start,   B1 = A1 + boreList[bi].len;
+      const A2 = boreList[bi+1].start, B2 = A2 + boreList[bi+1].len;
+      const boreGap = A2 - A1;
+      const singleStroke = Math.max(boreList[bi].len, boreList[bi+1].len);
+      let best = null;
+      const maxK = Math.ceil((boreGap/bar.spacing)) + 4;
+      for(let k=1; k<=maxK; k++){
+        const off = k*bar.spacing;
+        const lo = Math.min(A1, A2-off), hi = Math.max(B1, B2-off);
+        const stroke = hi - lo;
+        const mis = Math.abs(boreGap - off);
+        if(best===null || stroke < best.stroke) best = {k, off, stroke, mis};
+      }
+      const exact = Math.abs(best.mis) < 1e-9;
+      const sameOrient = (best.k % 2 === 0);
+      html += `<div class="readout"><span class="k">Bore ${bi+1} → Bore ${bi+2} spacing</span><span class="v">${fmt(boreGap,2)}<span class="unit">in start-to-start</span></span></div>`;
+      html += `<div class="readout"><span class="k">Best port pair <span class="flag calc">${best.k} ports apart</span></span><span class="v">${fmt(best.off,2)}<span class="unit">in apart</span></span></div>`;
+      if(exact){
+        html += `<div class="note"><span class="flag calc">exact match</span> ${bar.spacing}" port spacing divides evenly into this bore spacing — two tools line up perfectly, feed stroke is just the bore length (${fmt(singleStroke,2)}").</div>`;
+      } else {
+        html += `<div class="note"><span class="flag est">${fmt(best.mis,2)}" off</span> ${bar.spacing}" ports don't divide evenly into ${fmt(boreGap,2)}", so two tools can't line up exactly. <b>Not a blocker</b> — it just means feeding ${fmt(best.stroke,2)}" instead of ${fmt(singleStroke,2)}" so both tools fully clear their bores. Cost: ${fmt(best.stroke-singleStroke,2)}" extra stroke.</div>`;
+      }
+      html += `<div class="note">${sameOrient ? 'Both ports share the same orientation (even number of steps apart on an alternating-90° bar).' : 'These ports are 90° apart on an alternating bar — the two tools push in perpendicular directions. The bar rotates so both still cut round, but their deflection directions differ.'} Verify tool reach and that your feed unit has the stroke before committing.</div>`;
+    }
+  }
+
+  geo.innerHTML = html;
+
+  // --- All ports vs bearings, at end of cut ---
+  const ports = portsForBar(bar);
+  const allRows = ports.map(fromEnd => tipAtEnd - fromEnd).sort((a,b)=>a-b);
+  // Only list ports anywhere near the working area. Ports far behind
+  // Bearing 1 are real but irrelevant noise on a long bar.
+  const margin = 6;
+  const rows = allRows.filter(pos => pos >= bearingPositions[0]-margin && pos <= lastBearing+margin);
+  const hidden = allRows.length - rows.length;
+  $('portListNote').innerHTML = hidden>0
+    ? `Showing ${rows.length} of ${allRows.length} ports — the other ${hidden} sit well outside the bearing span (mostly behind Bearing 1 on a long bar) and aren't usable here.`
+    : `All ${rows.length} ports shown.`;
+  out.innerHTML = '';
+  rows.forEach(pos => {
+    const div = document.createElement('div');
+    div.className = 'toolcard';
+    let status = null;
+    for(let j=0; j<bearingPositions.length-1; j++){
+      if(bearingPositions[j] <= pos && pos <= bearingPositions[j+1]){
+        status = {text:`supported — Bearing ${j+1}–${j+2} span`, ok:true}; break;
+      }
+    }
+    if(!status){
+      if(pos > lastBearing) status = {text:`⚠ cantilever ${fmt(pos-lastBearing,2)}" past Bearing ${bearingPositions.length}`, ok:false};
+      else status = {text:'⚠ behind Bearing 1', ok:false};
+    }
+    div.innerHTML = `<div class="info">Port at ${fmt(pos,2)}" <span class="${status.ok?'flag calc':'flag warn'}">${status.text}</span></div>`;
+    out.appendChild(div);
+  });
+}
 
 // ============ INSERT & GRADE ADVISOR TAB ============
 // Material and cut type driven by shared Job Context (jobBrain.material) —
@@ -1924,6 +2451,10 @@ document.querySelectorAll('#slThermOD, #slThermMat, #slCustomDT').forEach(el=>{
 renderJobContext();
 suggestGas();
 calcWeld();
+renderBoreList();
+renderBearingList();
+renderBarInv();
+recommendBarLength();
 calcBearing();
 calcInsert();
 renderInv();
