@@ -214,8 +214,7 @@
       <input type="number" id="jc_modE" step="100000">
     </div>
   </div>
-  <div class="note">Edit here once — Bore Welding and Bearing Spacing (and, once merged, Insert Advisor and
-  Cutting Strategy Planner) all read these same values instead of asking for them separately.</div>
+  <div class="note">Edit once — every tool below reads these same values.</div>
 </div>
 
 <div class="maintabs">
@@ -304,7 +303,7 @@
 
     <div class="divider"></div>
     <h2>Bore Targets (Full Layer mode)</h2>
-    <div class="note">Bore diameter and current/target ID now come from the shared Job Context panel above.</div>
+    <div class="note">Bore sizes come from Job Context above.</div>
     <div class="field">
       <label>Specify weld stop point by</label>
       <select id="stopSpecMode">
@@ -403,13 +402,7 @@
 <div class="maintabpanel" id="mtab-bearing">
 <div class="panel">
   <h2>Setup — bearings along the bar</h2>
-  <div class="note">Bar diameter and bore length come from the shared Job Context panel above. <b>Corrected:</b>
-  most portable line boring setups use more than two bearings, not just a near/far pair — this now models any
-  number of bearings positioned along the bar, matching a real multi-bearing layout (e.g. the BB5000 wide-span
-  setup with an intermediate mid-bearing), not just the two-endpoint case.</div>
-
-  <div class="note" style="margin-top:10px;">Bearing 1 is the reference point (position 0", nearest the
-  machine/drive). Add each additional bearing as its distance from Bearing 1.</div>
+  <div class="note">Bearing 1 = 0", nearest the drive. Add the rest as distance from it.</div>
   <div id="bearingList"></div>
   <div class="row" style="margin-top:8px;">
     <div class="field">
@@ -422,9 +415,7 @@
   </div>
 
   <div class="divider"></div>
-  <div class="note" style="margin-bottom:6px;"><b>Bores in this setup</b> — same reference frame as the
-  bearings (0" = Bearing 1). Add each bore you'll machine without breaking the setup down. Bore 1's length
-  stays synced to the shared Job Context.</div>
+  <div class="note" style="margin-bottom:6px;"><b>Bores in this setup</b> — same reference as the bearings.</div>
   <div id="boreList"></div>
   <div class="row" style="margin-top:8px;">
     <div class="field">
@@ -437,10 +428,12 @@
     </div>
   </div>
   <button class="btn" id="addBoreBtn">Add bore</button>
-  <div class="note">The cutter travels through the bore length, crossing whichever bearings/sub-spans lie
-  along the way — this checks every sub-span the cutter passes through (including local worst points inside
-  a span, not just the two ends of the whole bore), plus cantilever past the last bearing if the bore extends
-  beyond it.</div>
+  <details><summary>How this is calculated</summary><div class="details-body"><div class="note">
+  The cutter travels through each bore, crossing whichever bearings lie along the way. Every sub-span the
+  cutter passes through is checked — including local worst points inside a span, not just the ends of the
+  bore — plus cantilever past the last bearing if a bore extends beyond it. Multi-bearing layouts (e.g. a
+  BB5000 wide span with a mid-bearing) are handled directly rather than approximated as a near/far pair.
+  </div></div></details>
   <div class="field" style="margin-top:10px;">
     <label>Cutting load — direct entry (lbf), overridden below if using cutting-parameter mode</label>
     <input type="number" id="cutLoad" value="400" step="10">
@@ -449,10 +442,7 @@
 
 <div class="panel">
   <h2>Boring Bar Inventory — tool port safety check</h2>
-  <div class="note">Bar profile is pure bar geometry — first port measured from the physical end of the bar,
-  then uniform center-to-center spacing for the rest. <b>Bar position is set by which tool port you're
-  cutting from</b> (selected below), not assumed — the port carrying the tool sits at the cut, and everything
-  else (tip overhang, rear overhang) follows from that.</div>
+  <div class="note">Bar geometry only. Position is set by the tool port you select below.</div>
 
   <div class="row" style="margin-top:10px;">
     <div class="field">
@@ -534,10 +524,7 @@
   <details>
     <summary>Derive cutting force from depth of cut, feed &amp; material (advanced)</summary>
     <div class="details-body">
-      <div class="note" style="margin-bottom:10px;">Uses tangential force = specific cutting force × depth of cut × feed
-      (Sandvik/Kienzle model), then converts to the <b>radial</b> force component — the one that actually
-      deflects a boring tool and hurts bore accuracy — based on insert lead angle. Enable to override the
-      direct cutting-load entry above. Material comes from the shared Job Context panel.</div>
+      <div class="note" style="margin-bottom:10px;">Tangential force = Kc × DOC × feed, converted to the <b>radial</b> component (the one that deflects the tool) via lead angle. Overrides the direct load entry above.</div>
       <div class="field">
         <label><input type="checkbox" id="useForceModel"> Use this instead of direct cutting-load entry</label>
       </div>
@@ -570,8 +557,7 @@
 
 <div class="panel">
   <h2>Insert &amp; Grade Recommendation</h2>
-  <div class="note">Material and cut type come from the shared Job Context panel above. Tooling lives here,
-  in the process that actually uses it — not a separate tab.</div>
+  <div class="note">Material and cut type come from Job Context above.</div>
   <div class="field" style="margin-top:10px;">
     <label><input type="checkbox" id="interrupted"> Interrupted cut (keyway, cross-hole, out-of-round stock)</label>
   </div>
@@ -609,10 +595,7 @@
   <details>
     <summary>Insert/toolholder overhang from bar body (advanced, second cantilever)</summary>
     <div class="details-body">
-      <div class="note" style="margin-bottom:10px;">A separate, smaller cantilever: how far the cutting
-      insert/toolholder projects from the bar body itself, distinct from the bar's overhang from its bearing.
-      <b>This is the toolholder's physical stickout — a different dimension from the insert's nose radius/lead
-      angle above.</b> Inventory doesn't track holder stickout yet, so this stays a direct entry.</div>
+      <div class="note" style="margin-bottom:10px;">Toolholder stickout from the bar body — a separate, smaller cantilever from the bar's own overhang. Not tracked in inventory, so entered directly.</div>
       <div class="row">
         <div class="field">
           <label>Insert/toolholder overhang from bar (in)</label>
@@ -877,12 +860,7 @@
 <div class="maintabpanel" id="mtab-sleeve">
 <div class="panel">
   <h2>Interference Fit &amp; ID Collapse</h2>
-  <div class="note" style="margin-bottom:10px;">Uses the actual Lamé thick-wall cylinder equations — not a flat
-  "collapse percentage" rule of thumb. Cross-checked against multiple field sources during research: they
-  disagreed sharply (one said 70–90% collapse, another said 0.5–2%) because collapse genuinely depends on
-  wall thickness and housing rigidity, not a fixed percentage. Verified this formula reproduces that pattern
-  correctly — thin bushing in a rigid housing → ~95% collapse; thick bushing in a massive housing → ~33% —
-  matching what field practitioners actually report.</div>
+  <div class="note" style="margin-bottom:10px;">Uses Lamé thick-wall cylinder equations, not a flat collapse percentage — real collapse depends on wall thickness and housing rigidity (thin bushing in a rigid housing ≈95%, thick bushing in a massive housing ≈33%).</div>
   <div class="row">
     <div class="field">
       <label>Bushing final target ID (in)</label>
@@ -1734,7 +1712,7 @@ function recommendBarLength(){
 
   let html = '<div class="divider"></div>';
   html += `<div class="readout"><span class="k">Minimum bar length for this setup <span class="flag calc">calc</span></span><span class="v">${fmt(minLen,1)}<span class="unit">in (${fmt(minLen/12,2)} ft)</span></span></div>`;
-  html += `<div class="note">Furthest cut point is ${fmt(boreEndMax,1)}" from Bearing 1. Using a port ${fmt(P,1)}" from the tip, the bar tip reaches ${fmt(boreEndMax+P,1)}" at the end of the pass — so the bar must be long enough for its rear to still sit ${fmt(engage,1)}" into the drive at that moment. Using a port further from the tip needs a proportionally longer bar.</div>`;
+  html += `<div class="note">Furthest cut ${fmt(boreEndMax,1)}" out; with a port ${fmt(P,1)}" from the tip the bar reaches ${fmt(boreEndMax+P,1)}" and must still sit ${fmt(engage,1)}" in the drive. A port further from the tip needs a longer bar.</div>`;
 
   if(bars.length){
     const fits = bars.filter(b => b.len >= minLen).sort((a,b)=>a.len-b.len);
@@ -1792,7 +1770,7 @@ function analyzePorts(){
   let html = '';
   if(activeFace){
     html += `<div class="readout"><span class="k">Active port orientation</span><span class="v">${activeFace}</span></div>`;
-    html += `<div class="note">Ports alternate 90° along this bar, so consecutive ports face opposite ways — worth confirming before you mount the tool. Ports an <b>even</b> number of steps apart share a face; an odd number are 90° apart.</div>`;
+    html += `<div class="note">Consecutive ports face opposite ways. Even steps apart = same face, odd = 90° apart.</div>`;
   }
 
   // --- Tip overhang: the loaded cantilever that actually drives chatter ---
@@ -1807,7 +1785,7 @@ function analyzePorts(){
     html += `<div class="readout"><span class="k">Overhang L/D ratio</span><span class="v">${fmt(ld,2)}<span class="unit">:1</span></span></div>`;
     html += `<div class="note"><span class="${ldFlag}">${fmt(ld,1)}:1</span> ${ldNote}.</div>`;
     html += `<div class="readout"><span class="k">Cantilever natural frequency <span class="flag est">chatter indicator</span></span><span class="v">${fmt(fn,0)}<span class="unit">Hz</span></span></div>`;
-    html += `<div class="note">Standard cantilever 1st-mode formula. Lower frequency = more chatter-prone: natural frequency falls off sharply as overhang grows (roughly with the square of length), which is why a small increase in stick-out past the last bearing has an outsized effect on chatter. This is the overhang that actually carries cutting load.</div>`;
+    html += `<div class="note">Lower frequency = more chatter-prone. Falls off sharply as overhang grows, so small increases in stick-out matter a lot. This is the overhang carrying cutting load.</div>`;
   } else {
     html += `<div class="readout"><span class="k">Tip overhang past last bearing</span><span class="v"><span class="flag calc">none</span></span></div>`;
     html += `<div class="note">Tool port stays within the supported bearing span through the whole cut — the stiffest arrangement.</div>`;
@@ -1817,7 +1795,7 @@ function analyzePorts(){
   html += `<div class="divider"></div>`;
   if(rearBehindRDU > 0){
     html += `<div class="readout"><span class="k">Bar protruding behind RDU <span class="flag est">unloaded</span></span><span class="v">${fmt(rearBehindRDU,2)}<span class="unit">in</span></span></div>`;
-    html += `<div class="note">This end carries no cutting force, so it does not deflect the tool — deliberately <b>not</b> added into the deflection numbers. It does add rotating mass and can whip at speed. No verified formula for that effect was found, so it is reported as a distance to be aware of, not converted into a fabricated number. Watch it physically if it is long.</div>`;
+    html += `<div class="note">Carries no cutting force — not in the deflection numbers. Adds rotating mass and can whip. No verified formula for that, so it's a distance to watch, not a calculated figure.</div>`;
   } else {
     html += `<div class="readout"><span class="k">Bar protruding behind RDU</span><span class="v"><span class="flag calc">none</span></span></div>`;
   }
@@ -1830,13 +1808,13 @@ function analyzePorts(){
     const lossPerp  = (1 - I_perp/I)*100;
     html += `<div class="divider"></div>`;
     html += `<div class="readout"><span class="k">Stiffness loss at the active port <span class="flag warn">in the radial force direction</span></span><span class="v">${fmt(lossAlong,0)}<span class="unit">%</span></span></div>`;
-    html += `<div class="note"><b>Correction worth stating plainly:</b> this is not an avoidable "worst-case orientation." The radial cutting force pushes the tool back <b>along its own port axis</b>, so the port carrying the tool always bends in the direction where its hole removes the most material. A ${bar.portDia}" port in a ${d}" bar costs about ${fmt(lossAlong,0)}% of section stiffness in that direction, versus only about ${fmt(lossPerp,0)}% across it.</div>`;
+    html += `<div class="note">Radial force pushes the tool back along its own port axis, so the active port always bends where its hole removes most material — ${fmt(lossAlong,0)}% loss that way vs ${fmt(lossPerp,0)}% across it. Not avoidable by rotating.</div>`;
     if(bar.portOrient === 'alt90'){
-      html += `<div class="note"><span class="flag calc">ports alternating 90°</span> Good news for this bar: because neighbouring ports are rotated 90°, they only weaken the <i>perpendicular</i> direction (~${fmt(lossPerp,0)}%), so they add very little to bending in the active port's direction. The weakening stays local to the port in use instead of stacking up along the bar.</div>`;
+      html += `<div class="note"><span class="flag calc">alt 90°</span> Neighbouring ports only weaken the perpendicular direction (~${fmt(lossPerp,0)}%), so weakening stays local instead of stacking along the bar.</div>`;
     } else if(bar.portOrient === 'aligned'){
       html += `<div class="note"><span class="flag warn">ports all aligned</span> Every port on this bar weakens the same direction, so ports near the cut compound the loss rather than distributing it. An alternating-90° bar is stiffer in practice for the same port size. Magnitude of the stacked effect isn't modelled here — a full variable-section beam analysis would be needed, so this is a directional flag, not a number.</div>`;
     }
-    html += `<div class="note">Still <b>local to the port cross-section</b>, not a property of the whole bar — reported as a flag rather than folded into the deflection numbers above, which would overstate it across the full span.</div>`;
+    html += `<div class="note">Local to the port cross-section — flagged, not folded into the deflection numbers above.</div>`;
   }
 
   // --- Port recommendation ---
@@ -1867,7 +1845,7 @@ function analyzePorts(){
     } else if(cur){
       html += `<div class="note"><span class="flag calc">already on it</span> Your selected port is the best available choice for this setup.</div>`;
     }
-    html += `<div class="note">Ranked purely on tip overhang past the last bearing, filtered to ports that keep the bar engaged in the drive. It does not account for physical access, tool reach into the bore, or where the cut actually needs to land — those are still your call.</div>`;
+    html += `<div class="note">Ranked on tip overhang, filtered to ports that keep the bar in the drive. Access, tool reach and where the cut lands are still your call.</div>`;
   }
 
   // --- Multi-bore: can two tools cut both bores in one pass? ---
